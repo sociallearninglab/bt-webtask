@@ -1,0 +1,34 @@
+html,body{margin:0;background:#ffffff;
+  font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;}
+.jspsych-content{max-width:900px;}
+
+/* Typography — mirrors diff_time_sliders_adult_replication's .jspsych-display-element */
+.jspsych-display-element{font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  font-size:17px;line-height:1.7;color:#2c3e50;}
+
+.bt-instructions{max-width:800px;margin:0 auto;text-align:left;
+  background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:30px 40px;}
+.bt-instructions p{margin-bottom:14px;}
+.bt-instructions h2{font-weight:650;letter-spacing:-0.01em;margin-top:0;}
+.bt-stage-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;}
+.bt-status{font-size:15px;color:#12240f;min-height:22px;font-weight:600;}
+.bt-sub{font-size:13px;color:#4a5a46;min-height:18px;}
+canvas.bt-field{border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.35);background:#000;touch-action:none;max-width:100%;height:auto;}
+.bt-panel{background:#fafafa;color:#2c3e50;border-radius:8px;border:1px solid #e0e0e0;padding:30px 40px;}
+.bt-panel p{margin-bottom:14px;}
+textarea{font-family:inherit;}
+
+/* Buttons — mirrors diff_time_sliders_adult_replication's .jspsych-btn exactly */
+.jspsych-btn{font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  font-size:15px;font-weight:600;padding:10px 30px;border:none;border-radius:6px;
+  background-color:#3498db;color:#fff;cursor:pointer;transition:background-color 0.2s;margin-top:10px;}
+.jspsych-btn:hover{background-color:#2980b9;}
+.jspsych-btn:active{background-color:#1f6da3;}
+
+/* Consent container — matches diff_time_sliders_adult_replication's
+   .consent-container formatting exactly (box, spacing, line-height) so the
+   consent text can be edited in place without also having to redo layout. */
+.bt-consent{max-width:800px;margin:0 auto;text-align:left;line-height:1.7;
+  background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:30px 40px;}
+.bt-consent p{margin-bottom:14px;}
+.bt-consent a{color:#3498db;}
