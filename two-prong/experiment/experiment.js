@@ -919,6 +919,16 @@ const micTestTrial = {
     let passed = false, stream = null, audioReady = false;
 
     if(btn){ btn.disabled = true; btn.style.opacity = 0.5; btn.style.cursor = 'not-allowed'; }
+    // The mic permission prompt can kick some browsers out of fullscreen (entered
+    // right after consent). Re-request it on this Continue click — a fresh, direct
+    // user gesture — as a second layer on top of the "Return to Fullscreen" overlay
+    // that already appears automatically (via the global fullscreenchange listener)
+    // if a participant exits fullscreen at any other point in the task.
+    if(!BT_CONFIG.TESTING && btn){
+      btn.addEventListener('click', function(){
+        document.documentElement.requestFullscreen().catch(e=>console.warn('Fullscreen request failed:', e));
+      });
+    }
 
     function setMicColor(color){
       micBody.setAttribute('fill', color);
