@@ -866,8 +866,17 @@ const consentTrial={type:jsPsychHtmlButtonResponse,
   `,
   choices:['I AGREE'],
   data:{ screen:'consent' },
-  on_finish:function(){
-    if(!BT_CONFIG.TESTING) document.documentElement.requestFullscreen().catch(()=>{});
+  on_load:function(){
+    if(BT_CONFIG.TESTING) return;
+    // Attach directly to the click (rather than trial on_finish, which fires
+    // after jsPsych's internal promise chain — that microtask gap is enough
+    // for some browsers to silently refuse requestFullscreen() as no longer
+    // being "in response to a user gesture"). This runs synchronously inside
+    // the actual click event, so it's never rejected for that reason.
+    const btn=document.querySelector('.jspsych-btn');
+    if(btn) btn.addEventListener('click', function(){
+      document.documentElement.requestFullscreen().catch(e=>console.warn('Fullscreen request failed:', e));
+    });
   }};
 
 // ==========================================================================
