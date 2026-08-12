@@ -1,6 +1,9 @@
 html,body{margin:0;background:#ffffff;
   font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;}
-.jspsych-content{max-width:900px;}
+/* Content area can grow on wide screens (so the field canvas below has room
+   to scale up); text panels/instructions cap their own width independently
+   (see .bt-instructions/.bt-panel/.bt-consent) so paragraphs stay readable. */
+.jspsych-content{max-width:1200px;width:94vw;margin:0 auto;}
 
 /* Typography — mirrors diff_time_sliders_adult_replication's .jspsych-display-element */
 .jspsych-display-element{font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
@@ -13,8 +16,19 @@ html,body{margin:0;background:#ffffff;
 .bt-stage-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;}
 .bt-status{font-size:15px;color:#12240f;min-height:22px;font-weight:600;}
 .bt-sub{font-size:13px;color:#4a5a46;min-height:18px;}
-canvas.bt-field{border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.35);background:#000;touch-action:none;max-width:100%;height:auto;}
-.bt-panel{background:#fafafa;color:#2c3e50;border-radius:8px;border:1px solid #e0e0e0;padding:30px 40px;}
+/* Scales fluidly with the viewport: bounded by a max size (so it doesn't get
+   pixelated on huge monitors — the canvas' native draw resolution is fixed
+   at 900x620), by viewport width (with margin so it never causes horizontal
+   scroll), and by viewport height (so it still fits alongside the status/sub
+   text and Continue button on short/laptop windows without scrolling). The
+   aspect-ratio keeps height in lockstep with width automatically, live, on
+   every resize — no JS needed; pointer coordinates already account for the
+   CSS-vs-canvas-buffer scale ratio (see canvasXY()).*/
+canvas.bt-field{border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.35);background:#000;
+  touch-action:none;display:block;
+  width:min(1100px, 92vw, calc(66vh * 900 / 620));
+  aspect-ratio:900/620;height:auto;}
+.bt-panel{max-width:800px;margin:0 auto;background:#fafafa;color:#2c3e50;border-radius:8px;border:1px solid #e0e0e0;padding:30px 40px;}
 .bt-panel p{margin-bottom:14px;}
 textarea{font-family:inherit;}
 
