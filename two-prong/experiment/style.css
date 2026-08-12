@@ -3,7 +3,7 @@ html,body{margin:0;background:#ffffff;
 /* Content area can grow on wide screens (so the field canvas below has room
    to scale up); text panels/instructions cap their own width independently
    (see .bt-instructions/.bt-panel/.bt-consent) so paragraphs stay readable. */
-.jspsych-content{max-width:1200px;width:94vw;margin:0 auto;}
+.jspsych-content{max-width:1200px;width:94vw;margin:auto;}
 
 /* Typography — mirrors diff_time_sliders_adult_replication's .jspsych-display-element */
 .jspsych-display-element{font-family:'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
