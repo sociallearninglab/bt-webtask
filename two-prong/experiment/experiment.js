@@ -1015,7 +1015,7 @@ const fieldPreview={type:jsPsychHtmlButtonResponse,
   }};
 
 const practiceExplainer={type:jsPsychHtmlButtonResponse,stimulus:panel(
-  `<p>First, you will have one practice throw without the field in order to
+  `<p>First, you will have two practice throws without the field in order to
   understand the controls.</p>`),
   choices:['Continue'], ...readGate()};
 
