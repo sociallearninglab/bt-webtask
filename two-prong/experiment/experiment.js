@@ -107,6 +107,17 @@ const PROLIFIC_PARAMS = (function(){
     session_id: p.get('SESSION_ID') || ''
   };
 })();
+// Proof of Human bot-detection (tracker script tag lives in index.html). Tag the
+// session with the same ID used elsewhere (Prolific PID if present, else our
+// stamp-based participant id) so a flagged session on the PoH dashboard can be
+// cross-referenced back to this participant's data. setRoundtableUserId must be
+// called after the tracker signals it's ready (roundtable:ready).
+window.addEventListener('roundtable:ready', function(){
+  if(typeof window.setRoundtableUserId==='function'){
+    window.setRoundtableUserId(PROLIFIC_PARAMS.prolific_pid || BT_CONFIG.participant);
+  }
+});
+
 const CONDITIONS = ["improvement","stochastic","unmanipulated"];
 const STRUCTURES = { improvement:"FFFSSSS", stochastic:"SSFFSFS", unmanipulated:"UUUUUUU" };
 
