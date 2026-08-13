@@ -711,18 +711,6 @@ function buildVRText(){
   return out;
 }
 
-function downloadVRText(){
-  try{
-    const text=buildVRText();
-    const blob=new Blob([text],{type:'text/plain'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url; a.download=`${BT_CONFIG.participant}.txt`;
-    document.body.appendChild(a); a.click();
-    setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},1000);
-  }catch(e){ console.error('export failed',e); }
-}
-
 // Balanced condition assignment via DataPipe (server-coordinated). Falls back to
 // random-per-device if no DataPipe ID or the request fails.
 async function assignCondition(){
@@ -753,8 +741,7 @@ function makeSaveTrial(){
     action: "save",
     experiment_id: BT_CONFIG.DATAPIPE_ID,
     filename: ()=>`${BT_CONFIG.participant}.txt`,
-    data_string: ()=>buildVRText(),
-    on_finish: (d)=>{ SESSION.uploadOK = !(d && d.success===false); }
+    data_string: ()=>buildVRText()
   };
 }
 
@@ -801,8 +788,6 @@ if(!BT_CONFIG.TESTING){
 const jsPsych = initJsPsych({
   on_finish: ()=>{
     if(BT_CONFIG.TESTING){ jsPsych.data.displayData(); return; }
-    // If the DataPipe save trial failed, fall back to a local download so no data is lost.
-    if(SESSION.uploadOK===false || !BT_CONFIG.DATAPIPE_ID){ downloadVRText(); }
     // Prolific participants: redirect to the study's completion URL. Everyone
     // else (direct/pilot links): show the plain thank-you screen.
     if(PROLIFIC_PARAMS.prolific_pid){
@@ -816,7 +801,7 @@ const jsPsych = initJsPsych({
 });
 
 // Session state. condition/structure/trialManager are resolved before the throws.
-const SESSION = { condition: null, structure:null, trialManager:null, blind:false, uploadOK:null };
+const SESSION = { condition: null, structure:null, trialManager:null, blind:false };
 
 function initSession(condition, blind){
   SESSION.condition = condition;
