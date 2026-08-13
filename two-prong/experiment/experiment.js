@@ -733,8 +733,9 @@ async function assignCondition(){
   return CONDITIONS[Math.floor(Math.random()*CONDITIONS.length)];
 }
 
-// Build the DataPipe save trial (official plugin). Uploads the VR-format text as
-// the file contents to the OSF component. Runs as the final timeline trial.
+// Build the DataPipe save trials (official plugin). Two files per participant:
+// the full raw jsPsych dataset as CSV (every trial, every field — nothing
+// curated out) and the VR-format text summary. Both run as final timeline trials.
 function makeSaveTrial(){
   return {
     type: jsPsychPipe,
@@ -744,21 +745,36 @@ function makeSaveTrial(){
     data_string: ()=>buildVRText()
   };
 }
+function makeRawSaveTrial(){
+  return {
+    type: jsPsychPipe,
+    action: "save",
+    experiment_id: BT_CONFIG.DATAPIPE_ID,
+    filename: ()=>`${BT_CONFIG.participant}.csv`,
+    data_string: ()=>jsPsych.data.get().csv()
+  };
+}
 
-// Backup save on tab close/reload: fires a best-effort sendBeacon POST straight
+// Backup save on tab close/reload: fires best-effort sendBeacon POSTs straight
 // to DataPipe (bypasses jsPsych/the pipe plugin, since beforeunload can't await
 // a fetch) so a closed tab or crash mid-session doesn't lose all data. Uses the
-// same filename as the final save trial, so it's simply overwritten by the real
-// save if the participant finishes normally.
+// same filenames as the final save trials, so they're simply overwritten by the
+// real save if the participant finishes normally.
 if(!BT_CONFIG.TESTING && BT_CONFIG.DATAPIPE_ID){
   window.addEventListener('beforeunload', function(){
     try{
-      const blob = new Blob([JSON.stringify({
+      const txtBlob = new Blob([JSON.stringify({
         experimentID: BT_CONFIG.DATAPIPE_ID,
         filename: `${BT_CONFIG.participant}.txt`,
         data: buildVRText()
       })], { type: 'application/json' });
-      navigator.sendBeacon('https://pipe.jspsych.org/api/data/', blob);
+      navigator.sendBeacon('https://pipe.jspsych.org/api/data/', txtBlob);
+      const csvBlob = new Blob([JSON.stringify({
+        experimentID: BT_CONFIG.DATAPIPE_ID,
+        filename: `${BT_CONFIG.participant}.csv`,
+        data: jsPsych.data.get().csv()
+      })], { type: 'application/json' });
+      navigator.sendBeacon('https://pipe.jspsych.org/api/data/', csvBlob);
     }catch(e){ /* best-effort only */ }
   });
 }
@@ -1320,7 +1336,7 @@ function buildRun(){
     choices:['Continue'], ...readGate()});
   for(let i=0;i<NUM_THROWS;i++) tl.push(makeThrowTrial({isPractice:false}));
   tl.push(relativeSkill, magnitude, studyPurpose, demographicsTrial, debrief);
-  if(!BT_CONFIG.TESTING && BT_CONFIG.DATAPIPE_ID){ tl.push(makeSaveTrial()); }
+  if(!BT_CONFIG.TESTING && BT_CONFIG.DATAPIPE_ID){ tl.push(makeRawSaveTrial(), makeSaveTrial()); }
   return tl;
 }
 
