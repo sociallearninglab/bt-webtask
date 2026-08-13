@@ -696,11 +696,18 @@ function buildVRText(){
   // append the post-task questionnaire answers as a trailing block
   const q=(m)=>{const v=jsPsych.data.get().filter({measure:m}).last(1).values()[0];return v;};
   const rel=q('relative_skill_direction'), mag=q('relative_skill_magnitude');
-  const purpose=q('study_purpose');
+  const purpose=q('study_purpose'), demo=q('demographics');
   out+=`--- RESPONSES ---${CRLF}`;
   out+=`Q1 ABILITY CHANGE (better/worse/same): ${rel?rel.relative_skill:''}${CRLF}`;
   out+=`Q2 MAGNITUDE (1-10, if better/worse): ${(mag&&mag.magnitude!=null)?mag.magnitude:''}${CRLF}`;
   out+=`Q3 PERCEIVED STUDY PURPOSE: ${(purpose&&purpose.purpose_text!=null)?purpose.purpose_text:''}${CRLF}`;
+  out+=`Q4 AGE: ${demo?demo.demo_age:''}${CRLF}`;
+  out+=`Q5 NATIVE LANGUAGE: ${demo?demo.demo_language:''}${CRLF}`;
+  out+=`Q6 ETHNICITY: ${demo?demo.demo_ethnicity:''}${CRLF}`;
+  out+=`Q7 GENDER: ${demo?demo.demo_gender:''}${CRLF}`;
+  out+=`Q8 COLORBLINDNESS: ${demo?demo.demo_colorblind:''}${CRLF}`;
+  out+=`Q9 ABLE TO FOCUS: ${demo?demo.demo_focus:''}${CRLF}`;
+  out+=`Q10 ISSUES ENCOUNTERED: ${demo?demo.demo_issues:''}${CRLF}`;
   return out;
 }
 
@@ -1216,6 +1223,65 @@ const studyPurpose={type:jsPsychHtmlButtonResponse,
   },
   on_finish:(d)=>{ d.purpose_text = window.__purpose||''; }};
 
+// Ported from diff_time_sliders_adult_replication's demographicsTrial. That
+// version uses the survey-html-form plugin (not loaded here); rebuilt as a
+// plain button-response trial with manual input capture to match how the
+// rest of two-prong's free-response screens (studyPurpose, above) work,
+// rather than adding a new plugin dependency for one trial.
+const demographicsTrial={type:jsPsychHtmlButtonResponse,
+  stimulus:panel(`<p>Finally, we have a few demographic questions for you.</p>
+    <div style="text-align:left;max-width:460px;margin:0 auto;">
+      <p>How old are you? <input type="text" id="bt-demo-age" size="5"></p>
+      <p>What is your native/first language? <input type="text" id="bt-demo-language" size="20"></p>
+      <p>What is your ethnicity?
+        <select id="bt-demo-ethnicity">
+          <option value="">-- Select --</option>
+          <option value="white">White</option>
+          <option value="hispanic">Hispanic or Latino</option>
+          <option value="asian">Asian/Pacific Islander</option>
+          <option value="black">Black or African American</option>
+          <option value="native">Native American</option>
+          <option value="other">Other</option>
+        </select>
+      </p>
+      <p>What is your gender?
+        <select id="bt-demo-gender">
+          <option value="">-- Select --</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="other">Other</option>
+        </select>
+      </p>
+      <p>Do you have any colorblindness? <input type="text" id="bt-demo-colorblind" size="20"></p>
+      <p>Were you able to focus throughout the experiment?
+        <select id="bt-demo-focus">
+          <option value="">-- Select --</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+          <option value="kind of">Kind of</option>
+        </select>
+      </p>
+      <p>Did you run into any issues? <input type="text" id="bt-demo-issues" size="40"></p>
+    </div>`),
+  choices:['Continue'], data:{measure:'demographics'},
+  on_load:function(){
+    const fields=['age','language','ethnicity','gender','colorblind','focus','issues'];
+    window.__demo={};
+    fields.forEach(f=>{
+      const el=document.getElementById('bt-demo-'+f);
+      if(!el) return;
+      window.__demo[f]='';
+      el.addEventListener('input', ()=>{ window.__demo[f]=el.value; });
+      el.addEventListener('change', ()=>{ window.__demo[f]=el.value; });
+    });
+  },
+  on_finish:(d)=>{
+    const m=window.__demo||{};
+    d.demo_age=m.age||''; d.demo_language=m.language||''; d.demo_ethnicity=m.ethnicity||'';
+    d.demo_gender=m.gender||''; d.demo_colorblind=m.colorblind||''; d.demo_focus=m.focus||'';
+    d.demo_issues=m.issues||'';
+  }};
+
 const debrief={type:jsPsychHtmlButtonResponse,stimulus:panel(`<h2>Thank you</h2>
   <p>Thank you for participating in our study! During this experiment, you were
   instructed to engage in a slingshot game. We asked you to attempt to achieve a
@@ -1268,7 +1334,7 @@ function buildRun(){
   tl.push({type:jsPsychHtmlButtonResponse,stimulus:panel(`<p>Throw the ball as close to the <b>center</b> of the target as you can.</p>`),
     choices:['Continue'], ...readGate()});
   for(let i=0;i<NUM_THROWS;i++) tl.push(makeThrowTrial({isPractice:false}));
-  tl.push(relativeSkill, magnitude, studyPurpose, debrief);
+  tl.push(relativeSkill, magnitude, studyPurpose, demographicsTrial, debrief);
   if(!BT_CONFIG.TESTING && BT_CONFIG.DATAPIPE_ID){ tl.push(makeSaveTrial()); }
   return tl;
 }
