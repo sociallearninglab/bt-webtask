@@ -78,9 +78,7 @@ function euclideanFromCenter(p){return Math.sqrt(p.x*p.x+p.y*p.y);}
    when configured, else random per device). No picker. Data uploads to DataPipe/
    OSF at the end. Set DATAPIPE_ID to your DataPipe experiment ID to enable both
    balanced assignment and server upload. */
-// TODO(prolific): replace with your study's actual completion URL (Prolific
-// gives you this per-study, e.g. https://app.prolific.com/submissions/complete?cc=XXXXXXXX)
-const PROLIFIC_REDIRECT_URL = "https://app.prolific.com/submissions/complete?cc=REPLACE_ME";
+const PROLIFIC_REDIRECT_URL = "https://app.prolific.com/submissions/complete?cc=CDVQRXPD";
 
 const BT_CONFIG = {
   practiceThrows: 2,
