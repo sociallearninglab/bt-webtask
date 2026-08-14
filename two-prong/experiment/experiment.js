@@ -21,6 +21,12 @@
   center measure, trial strings) is a direct port of NEW_ball_improvement.py.
   Best-comparable contrast is improvement vs stochastic (S/F); U is an analogue
   requiring calibration.
+  DELIBERATE DEVIATION (as of 2026-08-14): success-trial target points are now
+  drawn from the same shrinking-ring formula in every condition (see
+  TrialManager.generateTargetPoint). improvement vs stochastic differ ONLY in
+  the temporal order of S/F trials (STRUCTURES), not in how tightly any given
+  success is coerced — this isolates trial-order/narrative as the sole
+  manipulated variable between those two conditions.
   ==========================================================================
 */
 
@@ -55,12 +61,14 @@ class TrialManager{
   generateTargetPoint(throwDirX){
     const t=this.getCurrentTrialType();
     if(t==='S'){
-      const angle=uniform(0,2*Math.PI); let radius;
-      if(this.condition==='improvement'){
-        const c=this._count('S');
-        if(c<this.successZoneSizes.length) radius=uniform(this.successZoneSizes[c],this.successZoneSizes[c-1]);
-        else radius=uniform(0,this.successZoneSizes[this.successZoneSizes.length-1]);
-      }else{ radius=uniform(0,this.getSuccessZoneSize()); }
+      // Same shrinking-ring draw for every condition — the only thing that
+      // differs between improvement/stochastic is the temporal order of
+      // S/F trials (see STRUCTURES), not how tightly a given success is coerced.
+      const angle=uniform(0,2*Math.PI);
+      const c=this._count('S');
+      let radius;
+      if(c<this.successZoneSizes.length) radius=uniform(this.successZoneSizes[c],this.successZoneSizes[c-1]);
+      else radius=uniform(0,this.successZoneSizes[this.successZoneSizes.length-1]);
       return {x:radius*Math.cos(angle), y:radius*Math.sin(angle), z:0};
     }else{
       const {right,left}=this.getFailureZoneRanges();
@@ -84,7 +92,9 @@ const BT_CONFIG = {
   practiceThrows: 2,
   TESTING: false,                // false = pilot (no picker/replay). true = testing picker.
   DATAPIPE_ID: "l4vuPmnrCh5F",   // DataPipe experiment ID (OSF project j8fxt)
-  NUM_CONDITIONS: 3
+  NUM_CONDITIONS: 2               // improvement/stochastic only — update DataPipe's
+                                   // project setting to match, or balanced assignment
+                                   // will drift (see assignCondition() fallback)
 };
 // auto participant id: clean local timestamp so files sort in play order and
 // never collide. Format: BT_WEB_YYYYMMDD_HHMMSS_<rand> (e.g. BT_WEB_20260724_1532_ab3)
@@ -116,7 +126,9 @@ window.addEventListener('roundtable:ready', function(){
   }
 });
 
-const CONDITIONS = ["improvement","stochastic","unmanipulated"];
+// unmanipulated is intentionally excluded from real-participant assignment
+// (kept in STRUCTURES/the testing picker for dev use, just not balanced-assigned).
+const CONDITIONS = ["improvement","stochastic"];
 const STRUCTURES = { improvement:"FFFSSSS", stochastic:"SSFFSFS", unmanipulated:"UUUUUUU" };
 
 
@@ -814,6 +826,16 @@ const jsPsych = initJsPsych({
   }
 });
 
+// Stamp every row of the raw CSV export with participant/recruitment IDs, same
+// fields diff_time_sliders_adult_replication uses (subject_id/prolific_pid/
+// study_id/session_id), so runs can be joined back to Prolific/DataPipe records.
+jsPsych.data.addProperties({
+  subject_id: BT_CONFIG.participant,
+  prolific_pid: PROLIFIC_PARAMS.prolific_pid,
+  study_id: PROLIFIC_PARAMS.study_id,
+  session_id: PROLIFIC_PARAMS.session_id
+});
+
 // Session state. condition/structure/trialManager are resolved before the throws.
 const SESSION = { condition: null, structure:null, trialManager:null, blind:false };
 
@@ -821,6 +843,7 @@ function initSession(condition, blind){
   SESSION.condition = condition;
   SESSION.structure = STRUCTURES[condition];
   SESSION.trialManager = new TrialManager(SESSION.structure, condition);
+  jsPsych.data.addProperties({ condition: condition }); // backfills into CSV once known
   SESSION.blind = !!blind;
 }
 
@@ -1353,10 +1376,9 @@ const timeline=[consentTrial, ...(BT_CONFIG.TESTING ? [] : [micTestTrial]), repl
 // Startup: in pilot mode, assign a (balanced) condition BEFORE running. In testing
 // mode, the picker sets the condition instead.
 async function startExperiment(){
-  // === TESTING OVERRIDE: force IMPROVEMENT for every run. ===
-  // Remove this block (and un-comment nothing else) to restore normal
-  // balanced/picker assignment.
-  const FORCE_CONDITION = "improvement";   // set to null to disable the override
+  // === TESTING OVERRIDE: force a single condition for every run. ===
+  // Leave null for real participants (normal balanced/picker assignment).
+  const FORCE_CONDITION = null;   // e.g. "improvement" to force, for local testing only
   if(FORCE_CONDITION){
     initSession(FORCE_CONDITION, false);
     jsPsych.run(timeline);
