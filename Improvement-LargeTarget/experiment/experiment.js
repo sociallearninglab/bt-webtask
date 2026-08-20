@@ -28,6 +28,15 @@
   success is coerced — this isolates trial-order/narrative as the sole
   manipulated variable between those two conditions.
   ==========================================================================
+
+  VARIANT (2026-08-14): Improvement-LargeTarget. Forked from two-prong to test
+  visual target-circle size as a manipulated variable, holding the scoring
+  zones (SUCCESS_ZONE_SIZES) fixed. This is the baseline/large-target arm —
+  the visual target ring is unchanged from two-prong (radius 1.2, same as the
+  outer scoring zone). Locked to the improvement condition only (see
+  CONDITIONS below); see sibling Improvement-SmallTarget for the 80%-smaller
+  target ring.
+  ==========================================================================
 */
 
 /* ===================== COERCION ENGINE (port of TrialManager) ===================== */
@@ -91,10 +100,13 @@ const PROLIFIC_REDIRECT_URL = "https://app.prolific.com/submissions/complete?cc=
 const BT_CONFIG = {
   practiceThrows: 2,
   TESTING: false,                // false = pilot (no picker/replay). true = testing picker.
-  DATAPIPE_ID: "l4vuPmnrCh5F",   // DataPipe experiment ID (OSF project j8fxt)
-  NUM_CONDITIONS: 2               // improvement/stochastic only — update DataPipe's
-                                   // project setting to match, or balanced assignment
-                                   // will drift (see assignCondition() fallback)
+  // Still points at two-prong's DataPipe/OSF project (l4vuPmnrCh5F) — no
+  // dedicated project set up for this variant yet, so real participant data
+  // here will land in the same OSF project as two-prong and
+  // Improvement-SmallTarget. Update before running real participants if that's
+  // not desired.
+  DATAPIPE_ID: "l4vuPmnrCh5F",
+  NUM_CONDITIONS: 1                // locked to improvement only for this variant
 };
 // auto participant id: clean local timestamp so files sort in play order and
 // never collide. Format: BT_WEB_YYYYMMDD_HHMMSS_<rand> (e.g. BT_WEB_20260724_1532_ab3)
@@ -126,9 +138,12 @@ window.addEventListener('roundtable:ready', function(){
   }
 });
 
-// unmanipulated is intentionally excluded from real-participant assignment
-// (kept in STRUCTURES/the testing picker for dev use, just not balanced-assigned).
-const CONDITIONS = ["improvement","stochastic"];
+// This variant is locked to improvement only — stochastic/unmanipulated are
+// excluded from real-participant assignment (kept in STRUCTURES/the testing
+// picker for dev use only). assignCondition() always resolves to
+// CONDITIONS[0] with a single-element array, whether via DataPipe or the
+// random fallback.
+const CONDITIONS = ["improvement"];
 const STRUCTURES = { improvement:"FFFSSSS", stochastic:"SSFFSFS", unmanipulated:"UUUUUUU" };
 
 
@@ -148,6 +163,23 @@ const STRUCTURES = { improvement:"FFFSSSS", stochastic:"SSFFSFS", unmanipulated:
    Constants are TUNABLE for piloting. They only affect U (real skill);
    S/F outcomes come from the coercion engine regardless.
    ------------------------------------------------------------------------- */
+
+// VARIANT (2026-08-19): controls where a SUCCESS throw's ball is visually SEEN
+// to rest (after roll), independent of the scored/logged outcome — i.e. does
+// it look like it landed inside the white target ring or not. Indexed by
+// success ordinal (1st..4th, 0-indexed array). Kept IDENTICAL between
+// Improvement-LargeTarget (ring radius 1.2) and Improvement-SmallTarget (ring
+// radius 0.24) on purpose: because Small's ring is nested inside Large's, this
+// one schedule produces visual "hits" on the last 3 successes for Large and
+// only the last (4th) for Small, without separate per-variant tuning. See
+// getOutcome()'s success branch for where this is used.
+const HIT_DIST_BY_ORDINAL = [
+  [1.5, 3.0],   // 1st success: diffuse miss, well outside both rings
+  [0.5, 1.0],   // 2nd success: inside Large's ring, outside Small's
+  [0.3, 0.7],   // 3rd success: inside Large's ring, outside Small's
+  [0.0, 0.15]   // 4th (final) success: inside both rings
+];
+
 const THROW_TUNING = {
   // pull-back -> power/aim
   MAX_PULL_PX: 95,         // drag length (px) that = full power (fits in-frame)
@@ -261,8 +293,8 @@ function drawScene(ctx){
   ctx.strokeStyle='#fff'; ctx.lineWidth=Math.max(2, 5*cl0.scale);
   ctx.beginPath(); ctx.moveTo(cl0.sx,cl0.sy); ctx.lineTo(cl1.sx,cl1.sy); ctx.stroke();
 
-  // dashed white target ring, flat on the ground at RING_D (radius 1.2)
-  drawGroundRing(ctx, 0, RING_D, 1.2, true);
+  // solid white target ring, flat on the ground at RING_D (radius 1.2)
+  drawGroundRing(ctx, 0, RING_D, 1.2, false);
 }
 
 /* Void scene for PRACTICE throws: empty neutral space, no field/walls/target.
@@ -1131,9 +1163,24 @@ function makeThrowTrial({isPractice, label}){
           if(sideSign>0) vx=Math.max(vx, 0.15*scoredDist);
           else vx=Math.min(vx, -0.15*scoredDist);
           vy = (scored.y>=0?1:-1) * Math.sqrt(Math.max(0, scoredDist*scoredDist - vx*vx));
-        } else { // success: lands near center; nudge toward their aim a touch
-          vx = scored.x*0.6 + intendedX*0.15 + noise()*T.RELEASE_NOISE*0.6;
-          vy = scored.y + noise()*T.RELEASE_NOISE*0.6;
+        } else { // success: visually diffuse — only "hits" the target ring on
+          // specific success ordinals (HIT_DIST_BY_ORDINAL above), regardless
+          // of what was actually scored. scored/dist_from_center (the logged
+          // data) is unaffected; this only changes where the ball is SEEN to
+          // rest. finalDist is the desired resting distance from ring center
+          // AFTER roll, so vy is back-solved to cancel the roll the caller
+          // will add (finalWorld.y = vy + ROLL_DIST*(0.5+power*0.7)).
+          const c = SESSION.trialManager._count('S');           // 1-indexed success ordinal
+          const range = HIT_DIST_BY_ORDINAL[Math.min(c,HIT_DIST_BY_ORDINAL.length)-1];
+          const finalDist = uniform(range[0], range[1]);
+          const angle = uniform(0, 2*Math.PI);
+          let fx = finalDist*Math.cos(angle), fy = finalDist*Math.sin(angle);
+          if(Math.abs(intendedX) > 0.05){ // keep it on the side they aimed, like the F branch
+            fx = Math.abs(fx) * (intendedX>=0 ? 1 : -1);
+          }
+          const rollOffset = T.ROLL_DIST*(0.5+power*0.7);
+          vx = fx;
+          vy = fy - rollOffset;
         }
         return { scored, visual:{x:vx, y:vy} };
       }

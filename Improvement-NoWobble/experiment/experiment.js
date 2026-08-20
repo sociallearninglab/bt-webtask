@@ -28,6 +28,16 @@
   success is coerced — this isolates trial-order/narrative as the sole
   manipulated variable between those two conditions.
   ==========================================================================
+
+  VARIANT (2026-08-18): Improvement-NoWobble. Forked from two-prong, both
+  conditions (improvement/stochastic) still live — NOT locked to improvement
+  only, despite the folder name (per explicit instruction). The only change is
+  THROW_TUNING: SWAY_VISUAL, SWAY_AIM, and PRONG_VISUAL are all zeroed, so the
+  catapult neither visually rocks/flexes nor perturbs aim on release — no
+  wobble at all. SWAY_MS/PRONG_MS (periods) are left as-is; they have no
+  effect once their amplitude constants are 0. Coercion engine/scoring zones
+  are untouched.
+  ==========================================================================
 */
 
 /* ===================== COERCION ENGINE (port of TrialManager) ===================== */
@@ -158,16 +168,15 @@ const THROW_TUNING = {
   // realism / hiding coercion
   RELEASE_NOISE: 0.55,     // per-throw release imprecision (world units), ALL conditions
   SKILL_NOISE: 0.22,       // extra motor noise on real (U/practice) throws
-  // catapult wobble (LARGE). Affects aim on real (U/practice) throws via the sway
-  // value at the moment of release. On coerced S/F it is visual only (can't move
-  // a predetermined landing).
-  SWAY_MS: 1500,           // handle (bottom) wobble period
-  SWAY_VISUAL: 0.9,        // how far the handle visually rocks (big)
-  SWAY_AIM: 0.6,           // how much release-moment wobble perturbs real-throw aim
-  // prongs (top) wobble independently at the joint — different period & amount,
-  // so the top and bottom lean in different ways (floppy/whipping look)
-  PRONG_MS: 950,           // prong wobble period (different from handle)
-  PRONG_VISUAL: 0.7,       // how far the prongs flex relative to the handle
+  // catapult wobble DISABLED for this variant (NoWobble): amplitudes zeroed so
+  // the catapult neither visually rocks/flexes nor perturbs aim at release.
+  // Periods left in place — inert once amplitude is 0.
+  SWAY_MS: 1500,           // handle (bottom) wobble period (inert, see above)
+  SWAY_VISUAL: 0,          // how far the handle visually rocks — 0 = no wobble
+  SWAY_AIM: 0,             // how much release-moment wobble perturbs real-throw aim — 0 = none
+  // prongs (top) wobble independently at the joint — disabled here too
+  PRONG_MS: 950,           // prong wobble period (inert, see above)
+  PRONG_VISUAL: 0,         // how far the prongs flex relative to the handle — 0 = no flex
   // flight / roll
   FLIGHT_MS: 1050,         // time in the air
   ROLL_MS: 650,            // time rolling after landing
