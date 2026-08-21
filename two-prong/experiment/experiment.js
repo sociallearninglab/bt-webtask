@@ -133,7 +133,7 @@ const STRUCTURES = { improvement:"FFFSSSS", stochastic:"SSFFSFS", unmanipulated:
 
 
 /* -------------------------------------------------------------------------
-   SLINGSHOT / CATAPULT THROW (Angry Birds style) — same across ALL conditions:
+   SLINGSHOT / CATAPULT THROW — same across ALL conditions:
      • DRAG the ball back from the catapult (mouse/touch). The drag vector sets
        BOTH power and aim: pull length -> power (bigger arc, further), pull
        side-to-side -> aim (left/right). Release to launch; the ball flies a big
@@ -706,18 +706,19 @@ function buildVRText(){
   // append the post-task questionnaire answers as a trailing block
   const q=(m)=>{const v=jsPsych.data.get().filter({measure:m}).last(1).values()[0];return v;};
   const rel=q('relative_skill_direction'), mag=q('relative_skill_magnitude');
-  const purpose=q('study_purpose'), demo=q('demographics');
+  const mc=q('manipulation_check'), mw=q('manipulation_what'), demo=q('demographics');
   out+=`--- RESPONSES ---${CRLF}`;
   out+=`Q1 ABILITY CHANGE (better/worse/same): ${rel?rel.relative_skill:''}${CRLF}`;
   out+=`Q2 MAGNITUDE (1-10, if better/worse): ${(mag&&mag.magnitude!=null)?mag.magnitude:''}${CRLF}`;
-  out+=`Q3 PERCEIVED STUDY PURPOSE: ${(purpose&&purpose.purpose_text!=null)?purpose.purpose_text:''}${CRLF}`;
-  out+=`Q4 AGE: ${demo?demo.demo_age:''}${CRLF}`;
-  out+=`Q5 NATIVE LANGUAGE: ${demo?demo.demo_language:''}${CRLF}`;
-  out+=`Q6 ETHNICITY: ${demo?demo.demo_ethnicity:''}${CRLF}`;
-  out+=`Q7 GENDER: ${demo?demo.demo_gender:''}${CRLF}`;
-  out+=`Q8 COLORBLINDNESS: ${demo?demo.demo_colorblind:''}${CRLF}`;
-  out+=`Q9 ABLE TO FOCUS: ${demo?demo.demo_focus:''}${CRLF}`;
-  out+=`Q10 ISSUES ENCOUNTERED: ${demo?demo.demo_issues:''}${CRLF}`;
+  out+=`Q3 SUSPECTED MANIPULATION (yes/no): ${mc?(mc.suspected?'YES':'NO'):''}${CRLF}`;
+  out+=`Q4 WHAT MANIPULATED (if yes): ${(mw&&mw.manip_text!=null)?mw.manip_text:''}${CRLF}`;
+  out+=`Q5 AGE: ${demo?demo.demo_age:''}${CRLF}`;
+  out+=`Q6 NATIVE LANGUAGE: ${demo?demo.demo_language:''}${CRLF}`;
+  out+=`Q7 ETHNICITY: ${demo?demo.demo_ethnicity:''}${CRLF}`;
+  out+=`Q8 GENDER: ${demo?demo.demo_gender:''}${CRLF}`;
+  out+=`Q9 COLORBLINDNESS: ${demo?demo.demo_colorblind:''}${CRLF}`;
+  out+=`Q10 ABLE TO FOCUS: ${demo?demo.demo_focus:''}${CRLF}`;
+  out+=`Q11 ISSUES ENCOUNTERED: ${demo?demo.demo_issues:''}${CRLF}`;
   return out;
 }
 
@@ -920,10 +921,12 @@ const consentTrial={type:jsPsychHtmlButtonResponse,
   }};
 
 // ==========================================================================
-// Gates entry on a working, audible microphone before the task starts. Only
-// mic_access/peak_volume/time_to_pass_ms are recorded — no audio is captured
-// or stored (deliberately: nothing downstream needs it, and recording voice
-// would conflict with the anonymity promised in consent).
+// TODO(mic-test): ported from diff_time_sliders_adult_replication for parity.
+// Two-prong has NO verbal/audio task downstream — nothing reads mic_access,
+// peak_volume, or blocks_audio. This trial exists only to gate entry on a
+// working microphone and captures a short "blocks" recording as base64 in
+// the trial data, matching the source study exactly. Remove this trial (and
+// its timeline entry below) if you don't actually need a mic check/recording.
 // ==========================================================================
 const micTestTrial = {
   type: jsPsychHtmlButtonResponse,
@@ -952,9 +955,9 @@ const micTestTrial = {
     const micBase = document.getElementById('mic-base');
     const status = document.getElementById('mic-status');
     const btn = document.querySelector('.jspsych-btn');
-    const micData = { mic_access:false, peak_volume:0, time_to_pass_ms:null };
+    const micData = { mic_access:false, peak_volume:0, time_to_pass_ms:null, blocks_audio:null };
     const THRESHOLD = 0.3;
-    let passed = false, stream = null;
+    let passed = false, stream = null, audioReady = false;
 
     if(btn){ btn.disabled = true; btn.style.opacity = 0.5; btn.style.cursor = 'not-allowed'; }
     // The mic permission prompt can kick some browsers out of fullscreen (entered
@@ -975,7 +978,7 @@ const micTestTrial = {
       micBase.setAttribute('stroke', color);
     }
     function enableIfReady(){
-      if(passed && btn){ btn.disabled=false; btn.style.opacity=''; btn.style.cursor=''; }
+      if(passed && audioReady && btn){ btn.disabled=false; btn.style.opacity=''; btn.style.cursor=''; }
     }
 
     navigator.mediaDevices.getUserMedia({ audio:true }).then(function(s){
@@ -992,6 +995,21 @@ const micTestTrial = {
       source.connect(analyser);
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
+      const mediaRecorder = new MediaRecorder(stream);
+      const audioChunks = [];
+      mediaRecorder.ondataavailable = (e)=>audioChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          micData.blocks_audio = reader.result.split(',')[1];
+          audioReady = true;
+          enableIfReady();
+        };
+        reader.readAsDataURL(blob);
+      };
+      mediaRecorder.start();
+
       function updateMeter(){
         if(passed) return;
         analyser.getByteTimeDomainData(dataArray);
@@ -1006,8 +1024,8 @@ const micTestTrial = {
           micData.time_to_pass_ms = Math.round(performance.now()-startTime);
           setMicColor('#2e7d32');
           status.style.display = 'none';
-          enableIfReady();
           setTimeout(()=>{
+            mediaRecorder.stop();
             stream.getTracks().forEach(t=>t.stop());
             audioCtx.close();
           }, 1000);
@@ -1028,6 +1046,7 @@ const micTestTrial = {
       data.mic_access = micData.mic_access;
       data.peak_volume = Math.round(micData.peak_volume*1000)/1000;
       data.time_to_pass_ms = micData.time_to_pass_ms;
+      if(micData.blocks_audio) data.blocks_audio = micData.blocks_audio;
       if(micData.mic_error) data.mic_error = micData.mic_error;
       if(origFinish) origFinish(data);
     };
@@ -1216,21 +1235,32 @@ const magnitude={ timeline:[{type:jsPsychHtmlButtonResponse,
   conditional_function:()=>{ const l=jsPsych.data.get().filter({measure:'relative_skill_direction'}).last(1).values()[0];
     return l && (l.relative_skill==='better'||l.relative_skill==='worse'); }};
 
-const studyPurpose={type:jsPsychHtmlButtonResponse,
-  stimulus:panel(`<p>What do you think was the purpose of this study?</p>
-    <textarea id="bt-purpose" rows="4" style="width:100%;font-size:15px;padding:8px;box-sizing:border-box;"></textarea>`),
-  choices:['Continue'], data:{measure:'study_purpose'},
+const manipCheck={type:jsPsychHtmlButtonResponse,
+  stimulus:panel(`<p>During the task, did you think that any aspect of your
+    environment or ball throws were being <b>manipulated or altered</b>?</p>`),
+  choices:['No','Yes'], data:{measure:'manipulation_check'},
+  on_finish:(d)=>{ d.suspected = (d.response===1); }};
+
+// Conditional follow-up: only shown if they answered "Yes" above.
+const manipWhat={ timeline:[{type:jsPsychHtmlButtonResponse,
+  stimulus:panel(`<p>What do you think was manipulated or altered?</p>
+    <textarea id="bt-manip" rows="4" style="width:100%;font-size:15px;padding:8px;box-sizing:border-box;"></textarea>`),
+  choices:['Continue'], data:{measure:'manipulation_what'},
   on_load:function(){
-    const el=document.getElementById('bt-purpose');
-    if(el) el.addEventListener('input', ()=>{ window.__purpose=el.value; });
-    window.__purpose='';
+    const el=document.getElementById('bt-manip');
+    if(el) el.addEventListener('input', ()=>{ window.__manip=el.value; });
+    window.__manip='';
   },
-  on_finish:(d)=>{ d.purpose_text = window.__purpose||''; }};
+  on_finish:(d)=>{ d.manip_text = window.__manip||''; }}],
+  conditional_function:()=>{
+    const l=jsPsych.data.get().filter({measure:'manipulation_check'}).last(1).values()[0];
+    return l && l.suspected;   // only ask "what" if they answered Yes
+  }};
 
 // Ported from diff_time_sliders_adult_replication's demographicsTrial. That
 // version uses the survey-html-form plugin (not loaded here); rebuilt as a
 // plain button-response trial with manual input capture to match how the
-// rest of two-prong's free-response screens (studyPurpose, above) work,
+// rest of two-prong's free-response screens (manipWhat, above) work,
 // rather than adding a new plugin dependency for one trial.
 const demographicsTrial={type:jsPsychHtmlButtonResponse,
   stimulus:panel(`<p>Finally, we have a few demographic questions for you.</p>
@@ -1338,7 +1368,7 @@ function buildRun(){
   tl.push({type:jsPsychHtmlButtonResponse,stimulus:panel(`<p>Throw the ball as close to the <b>center</b> of the target as you can.</p>`),
     choices:['Continue'], ...readGate()});
   for(let i=0;i<NUM_THROWS;i++) tl.push(makeThrowTrial({isPractice:false}));
-  tl.push(relativeSkill, magnitude, studyPurpose, demographicsTrial, debrief);
+  tl.push(relativeSkill, magnitude, manipCheck, manipWhat, demographicsTrial, debrief);
   if(!BT_CONFIG.TESTING && BT_CONFIG.DATAPIPE_ID){ tl.push(makeRawSaveTrial(), makeSaveTrial()); }
   return tl;
 }
