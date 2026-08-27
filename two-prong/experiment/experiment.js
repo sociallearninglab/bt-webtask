@@ -61,30 +61,19 @@ class TrialManager{
   generateTargetPoint(throwDirX){
     const t=this.getCurrentTrialType();
     if(t==='S'){
-      // FIXED SAMPLE (identical for every participant): instead of drawing a random
-      // (angle, radius) each time, use a deterministic angle per success index and
-      // place the radius at the MIDPOINT of that success's shrinking ring. This
-      // keeps the improvement ring structure (1.2->0.9->0.6->0.3) but makes the
-      // exact target point the same across all participants. The angle sequence is
-      // fixed (spread around the circle) so successive successes aren't all in the
-      // same direction.
-      const c=this._count('S');                 // 1-based: 1st,2nd,... success
-      const FIXED_ANGLES=[0.4, 2.3, 4.1, 5.6, 1.2, 3.5, 5.0]; // radians, per success #
-      const angle=FIXED_ANGLES[(c-1)%FIXED_ANGLES.length];
-      let outer, inner;
-      if(c<this.successZoneSizes.length){ outer=this.successZoneSizes[c-1]; inner=this.successZoneSizes[c]; }
-      else { outer=this.successZoneSizes[this.successZoneSizes.length-1]; inner=0; }
-      const radius=(outer+inner)/2;              // midpoint of the ring (deterministic)
+      // Same shrinking-ring draw for every condition — the only thing that
+      // differs between improvement/stochastic is the temporal order of
+      // S/F trials (see STRUCTURES), not how tightly a given success is coerced.
+      const angle=uniform(0,2*Math.PI);
+      const c=this._count('S');
+      let radius;
+      if(c<this.successZoneSizes.length) radius=uniform(this.successZoneSizes[c],this.successZoneSizes[c-1]);
+      else radius=uniform(0,this.successZoneSizes[this.successZoneSizes.length-1]);
       return {x:radius*Math.cos(angle), y:radius*Math.sin(angle), z:0};
     }else{
-      // FIXED SAMPLE for failures too: the SIDE still follows the participant's
-      // throw direction (so the miss reads as their own throw), but the position
-      // within the chosen side's zone is fixed at the zone midpoint rather than
-      // random — identical distance/depth for every participant on a given failure.
       const {right,left}=this.getFailureZoneRanges();
-      const zone = throwDirX<0 ? right : left;
-      const x = (zone[0]+zone[1])/2;             // midpoint of the side zone
-      const y = (this.failY[0]+this.failY[1])/2; // midpoint depth
+      const x = throwDirX<0 ? uniform(right[0],right[1]) : uniform(left[0],left[1]);
+      const y = uniform(this.failY[0],this.failY[1]);
       return {x,y,z:0};
     }
   }
@@ -211,19 +200,6 @@ function project(x, d){
   const sy = FIELD.h - (FIELD.h - VIEW.horizon)*(dd/(dd+VIEW.camK));
   const sx = FIELD.w/2 + x*VIEW.lateralScale*scale;
   return {sx, sy, scale};
-}
-
-/* Inverse of project() for a GROUND point (z=0): screen (sx,sy) -> world (x,d).
-   Used by the recall phase, where the participant clicks anywhere on the ground
-   and we need world coordinates in the same space as logged landings. */
-function unproject(sx, sy){
-  const A = FIELD.h - VIEW.horizon;
-  let frac = (FIELD.h - sy) / A;                 // = d/(d+camK)
-  frac = Math.max(0, Math.min(0.999, frac));
-  const d = frac * VIEW.camK / (1 - frac);
-  const scale = VIEW.camK / (d + VIEW.camK);
-  const x = (sx - FIELD.w/2) / (VIEW.lateralScale * scale);
-  return { x, d };
 }
 
 function drawScene(ctx){
@@ -386,9 +362,7 @@ function realLandingFromControl(power, aim){
 function runThrow(ctx, opts){
   const sub=document.getElementById('bt-sub');
   const T=THROW_TUNING;
-  let raf=null, phase='ready', t0=0, flyStart=0, rollStart=0, resultStart=0;
-  let restScreen=null;                     // ball's resting screen pos, for the distance label
-  const RESULT_HOLD_MS=1100;               // how long to show the distance before advancing
+  let raf=null, phase='ready', t0=0, flyStart=0, rollStart=0;
   let dragging=false, dragDX=0, dragDY=0;         // drag delta from anchor (px)
   let swayNow=0;
   // The catapult holds perfectly still until the participant starts pulling the
@@ -539,36 +513,7 @@ function runThrow(ctx, opts){
       const cx=landPoint.x+(finalPoint.x-landPoint.x)*ease;
       const cd=landPoint.d+(finalPoint.d-landPoint.d)*ease;
       drawBall3D(ctx, cx, cd, 0);             // on the ground, no arc height
-      if(p>=1){
-        // remember where the ball came to rest (screen px) so the result phase can
-        // draw the distance label directly above it.
-        restScreen = project(cx, cd);
-        phase='showResult'; resultStart=now;
-      }
-    } else if(phase==='showResult'){
-      // hold the final frame briefly and print the distance-from-center above the
-      // ball. Distance shown is the SCORED Euclidean distance (VR-faithful, = what
-      // gets logged), so the number matches the data.
-      drawCatapult(ctx, swayNow);
-      const cx=finalPoint.x, cd=finalPoint.d;
-      drawBall3D(ctx, cx, cd, 0);
-      const pr = restScreen || project(cx, cd);
-      const distVal = euclideanFromCenter(scoredLanding);
-      const label = distVal.toFixed(2) + ' m';
-      ctx.font = 'bold 22px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      const tx = pr.sx, ty = pr.sy - 34;      // above the ball
-      // readable pill behind the text
-      const tw = ctx.measureText(label).width;
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.beginPath();
-      if(ctx.roundRect) ctx.roundRect(tx - tw/2 - 8, ty - 20, tw + 16, 28, 6);
-      else ctx.rect(tx - tw/2 - 8, ty - 20, tw + 16, 28);
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.fillText(label, tx, ty);
-      ctx.textAlign = 'start';
-      if((now-resultStart) >= RESULT_HOLD_MS){ phase='done'; cleanup();
+      if(p>=1){ phase='done'; cleanup();
         opts.onDone({landing:scoredLanding, dist:euclideanFromCenter(scoredLanding),
                      aim:resultAim, power:resultPower, holdMs:resultHoldMs,
                      landingPoint:visualLanding, finalPoint:finalWorld});
@@ -774,14 +719,6 @@ function buildVRText(){
   out+=`Q9 COLORBLINDNESS: ${demo?demo.demo_colorblind:''}${CRLF}`;
   out+=`Q10 ABLE TO FOCUS: ${demo?demo.demo_focus:''}${CRLF}`;
   out+=`Q11 ISSUES ENCOUNTERED: ${demo?demo.demo_issues:''}${CRLF}`;
-  // recall phase: per-throw recalled vs actual landing + signed radial bias
-  const recallTrial = jsPsych.data.get().filter({screen:'recall'}).last(1).values()[0];
-  if(recallTrial && Array.isArray(recallTrial.recall_data)){
-    out+=`${CRLF}--- RECALL ---${CRLF}`;
-    recallTrial.recall_data.forEach(r=>{
-      out+=`THROW ${r.trial_number} (${r.throw_type}): recalled [${r.recalled_x}, ${r.recalled_y}] actual [${r.actual_x}, ${r.actual_y}] error ${r.recall_error} signed_radial_bias ${r.signed_radial_bias}${CRLF}`;
-    });
-  }
   return out;
 }
 
@@ -1261,101 +1198,6 @@ function makeThrowTrial({isPractice, label}){
   };
 }
 
-/* ===================== RECALL PHASE =====================
-   After all throws, show the empty field and ask the participant to click where
-   they think each recorded throw landed, one at a time in order. Each placed
-   marker is labeled with its throw NUMBER, and the status line shows which throw
-   they are currently guessing. Logs recalled world coords alongside the actual
-   logged landing (recall_error, signed_radial_bias). */
-function makeRecallTrial(){
-  return {
-    type: jsPsychHtmlKeyboardResponse,
-    choices: "NO_KEYS",
-    stimulus: `<div class="bt-stage-wrap">
-        <div class="bt-status" id="bt-recall-status"></div>
-        <canvas class="bt-field" id="bt-recall-field" width="${FIELD.w}" height="${FIELD.h}"></canvas>
-        <div class="bt-sub" id="bt-recall-sub">Click on the field where you think this throw landed.</div></div>`,
-    data: { screen: 'recall' },
-    on_load: function(){
-      const canvas = document.getElementById('bt-recall-field');
-      const ctx = canvas.getContext('2d');
-      const statusEl = document.getElementById('bt-recall-status');
-
-      const throws = jsPsych.data.get()
-        .filter({ trial_kind:'throw', recorded:true })
-        .values()
-        .sort((a,b)=> (a.trial_number||0)-(b.trial_number||0));
-
-      const recalled = [];
-      let idx = 0;
-
-      function drawNumberedMarker(sx, sy, label){
-        ctx.beginPath(); ctx.arc(sx, sy, 12, 0, 2*Math.PI);
-        ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2; ctx.stroke();
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 14px system-ui, sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(String(label), sx, sy);
-        ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
-      }
-
-      function redraw(){
-        drawScene(ctx);
-        // show all markers already placed this phase, each labeled with its throw #
-        recalled.forEach(rp=>{
-          const g = _l2g_clamped({ x: rp.recalled_x, y: rp.recalled_y });
-          const pr = project(g.x, g.d);
-          drawNumberedMarker(pr.sx, pr.sy, rp.trial_number);
-        });
-      }
-
-      function prompt(){
-        if(idx >= throws.length){ finish(); return; }
-        const shownNum = throws[idx].trial_number != null ? throws[idx].trial_number : (idx+1);
-        statusEl.textContent = `Where did throw ${shownNum} of ${throws.length} land? (click the field)`;
-        redraw();
-      }
-
-      function onClick(e){
-        if(idx >= throws.length) return;
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width/rect.width, scaleY = canvas.height/rect.height;
-        const sx = (e.clientX - rect.left) * scaleX;
-        const sy = (e.clientY - rect.top)  * scaleY;
-        const w = unproject(sx, sy);
-        const recalled_x = w.x;
-        const recalled_y = w.d - RING_D;
-        const t = throws[idx];
-        const shownNum = t.trial_number != null ? t.trial_number : (idx+1);
-        const actual_x = +t.landing_x, actual_y = +t.landing_y;
-        const recalledDist = Math.hypot(recalled_x, recalled_y);
-        const actualDist   = Math.hypot(actual_x, actual_y);
-        recalled.push({
-          trial_number: shownNum,
-          throw_type: t.throw_type,
-          recalled_x: +recalled_x.toFixed(3),
-          recalled_y: +recalled_y.toFixed(3),
-          actual_x, actual_y,
-          recall_error: +Math.hypot(recalled_x-actual_x, recalled_y-actual_y).toFixed(3),
-          signed_radial_bias: +(recalledDist - actualDist).toFixed(3)
-        });
-        // briefly show the just-placed numbered marker, then move to the next throw
-        idx++;
-        redraw();
-        setTimeout(prompt, 350);
-      }
-
-      function finish(){
-        canvas.removeEventListener('click', onClick);
-        jsPsych.finishTrial({ recall_data: recalled });
-      }
-
-      canvas.addEventListener('click', onClick);
-      prompt();
-    }
-  };
-}
-
 const relativeSkill={type:jsPsychHtmlButtonResponse,
   stimulus:panel(`<h2>A few questions</h2><p>Do you think your ability at this ball
   throwing task got <b>better</b>, <b>worse</b>, or <b>stayed the same</b>?</p>`),
@@ -1526,13 +1368,6 @@ function buildRun(){
   tl.push({type:jsPsychHtmlButtonResponse,stimulus:panel(`<p>Throw the ball as close to the <b>center</b> of the target as you can.</p>`),
     choices:['Continue'], ...readGate()});
   for(let i=0;i<NUM_THROWS;i++) tl.push(makeThrowTrial({isPractice:false}));
-  tl.push({type:jsPsychHtmlButtonResponse, stimulus:panel(
-    `<p>Now we'd like to test your memory. On the next screen you'll see the empty
-     field. We'll ask you to click where you think <b>each of your throws landed</b>,
-     one at a time, in the order you threw them. The throw number you're guessing is
-     shown at the top, and each guess is marked with its number.</p>`),
-    choices:['Continue'], ...readGate()});
-  tl.push(makeRecallTrial());
   tl.push(relativeSkill, magnitude, manipCheck, manipWhat, demographicsTrial, debrief);
   if(!BT_CONFIG.TESTING && BT_CONFIG.DATAPIPE_ID){ tl.push(makeRawSaveTrial(), makeSaveTrial()); }
   return tl;
