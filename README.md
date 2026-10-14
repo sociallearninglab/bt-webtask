@@ -5,7 +5,7 @@ Each folder is a deployable version; Pages serves it from its own `index.html`.
 
 | Folder | Conditions | What it is |
 |---|---|---|
-| `two-prong/` | improvement, stochastic | The original. **Read the warning below.** |
+| `two-prong/` | improvement, stochastic | The original. slight issue see below |
 | `two-prong-FixedTargets/` | improvement, stochastic | `two-prong` with fixed coerced distances, the VR roll, and a debug ghost ball. |
 | `Improvement-LargeTarget/` | improvement | Visual ring radius 1.2. |
 | `Improvement-SmallTarget/` | improvement | Visual ring radius 0.24. |
