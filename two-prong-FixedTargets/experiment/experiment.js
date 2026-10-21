@@ -670,6 +670,27 @@ function runThrow(ctx, opts){
     ctx.fillText('GHOST (debug) — not shown to participants', 18, 30);
     ctx.fillText('real (ghost):  ' + realD.toFixed(2), 18, 50);
     ctx.fillText('shown (' + (opts.ghostLabel||'?') + '):     ' + shownD.toFixed(2), 18, 68);
+    if(!opts.rollToTarget){                     // unmanipulated: ground truth
+      ctx.fillStyle = '#9fe08f';
+      ctx.fillText('UNMANIPULATED — ghost should overlap', 18, 88);
+    }
+    ctx.restore();
+
+    // ---- lateral vs depth components, top right ----
+    const _f = v => (v>=0?'+':'') + v.toFixed(2);
+    const _s = scoredLanding || {x:0, y:0};
+    const _r = realLanding   || {x:0, y:0};
+    const RW = 262, RX = FIELD.w - 10 - RW;
+    ctx.save();
+    ctx.font = '600 13px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(RX, 10, RW, 92);
+    ctx.fillStyle = '#eaf6ff';
+    ctx.fillText('         LATERAL    DEPTH', RX + 10, 30);
+    ctx.fillText('shown  ' + _f(_s.x).padStart(8) + '  ' + _f(_s.y).padStart(8), RX + 10, 52);
+    ctx.fillText('real   ' + _f(_r.x).padStart(8) + '  ' + _f(_r.y).padStart(8), RX + 10, 70);
+    ctx.fillStyle = '#9fc39a';
+    ctx.fillText('+x right   +y past ring centre', RX + 10, 90);
     ctx.restore();
   }
 
@@ -805,7 +826,12 @@ function runThrow(ctx, opts){
     // it is the same path the live ball would have followed in the else-branch
     // above, and it runs on its own clock (FLIGHT_MS then ROLL_MS) rather than
     // the coerced ball's stretched roll.
-    ghostOn = !!(opts.showGhost && opts.rollToTarget && realLanding);
+    // Drawn on coerced trials (where it diverges from the live ball) AND on
+    // UNMANIPULATED trials (where it must sit exactly under it). The U case is the
+    // ground-truth check: if the ghost and the ball ever separate on a U trial, the
+    // ghost's model has drifted from the one driving the real throw. Skipped only
+    // in practice/void mode, where there is no field to read it against.
+    ghostOn = !!(opts.showGhost && realLanding && !opts.voidMode);
     if(ghostOn){
       ghostLand = landingToGround(realLanding);
       ghostFinal = landingToGround({ x:realLanding.x,
