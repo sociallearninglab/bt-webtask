@@ -101,7 +101,9 @@ const PROLIFIC_REDIRECT_URL = "https://app.prolific.com/submissions/complete?cc=
 const BT_CONFIG = {
   practiceThrows: 2,
   TESTING: false,                // false = pilot (no picker/replay). true = testing picker.
-  DATAPIPE_ID: "l4vuPmnrCh5F",   // DataPipe experiment ID (OSF project j8fxt)
+  // Migrated off OSF 2026-10-20: DataPipe stops writing to OSF after 2026-11-16
+  // and its OSF authorization has already expired. Now a Google Drive experiment.
+  DATAPIPE_ID: "TQv19MRhosQL",
   NUM_CONDITIONS: 2               // improvement/stochastic only — update DataPipe's
                                    // project setting to match, or balanced assignment
                                    // will drift (see assignCondition() fallback)

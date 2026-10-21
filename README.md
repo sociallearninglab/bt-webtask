@@ -3,16 +3,27 @@
 Web port of the VR ball-throwing task. Social Learning Lab @ Stanford.
 Each folder is a deployable version; Pages serves it from its own `index.html`.
 
-| Folder | Conditions | What it is |
-|---|---|---|
-| `two-prong/` | improvement, stochastic | The original. slight issue see below |
-| `two-prong-FixedTargets/` | improvement, stochastic | `two-prong` with fixed coerced distances, the VR roll, and a debug ghost ball. |
-| `Improvement-LargeTarget/` | improvement | Visual ring radius 1.2. |
-| `Improvement-SmallTarget/` | improvement | Visual ring radius 0.24. |
-| `Improvement-NoWobble/` | improvement, stochastic | Catapult wobble disabled. |
-| `Moving-Linear/` | improvement, stochastic | Ring sweeps left–right. Speed not calibrated. |
-| `Moving-Circular/` | improvement, stochastic | Ring orbits. Speed not calibrated. |
-| `analysis/` | — | Skill-slope fit and self-rating models. |
+| Folder | Conditions | DataPipe ID | What it is |
+|---|---|---|---|
+| `two-prong/` | impr, stoch, unmanip | `AYn3jtbYU1Ta` | The original. slight issue see below |
+| `two-prong-FixedTargets/` | impr, stoch, unmanip | `t7Lbeug3gFex` | `two-prong` with fixed coerced distances, the VR roll, and a debug ghost ball. |
+| `Improvement-LargeTarget/` | improvement | `sfqHienbSxWY` | Visual ring radius 1.2. |
+| `Improvement-SmallTarget/` | improvement | `Ugu95RqnufoA` | Visual ring radius 0.24. |
+| `Improvement-NoWobble/` | improvement, stochastic | `TQv19MRhosQL` | Catapult wobble disabled. |
+| `Moving-Linear/` | improvement, stochastic | `u9ylMYCjkVy4` | Ring sweeps left–right. Speed not calibrated. |
+| `Moving-Circular/` | improvement, stochastic | `6FWLEY6CQGNF` | Ring orbits. Speed not calibrated. |
+| `analysis/` | — | — | Skill-slope fit and self-rating models. |
+
+All seven write to **Google Drive** via DataPipe. The old OSF experiment
+`l4vuPmnrCh5F` is retired: DataPipe can no longer create OSF experiments, stops
+writing to OSF after **16 November 2026**, and its OSF authorization has already
+expired — anything still pointing there collects nothing. The 84 sessions already
+on OSF are unaffected and stay in the OSF account.
+
+Each version has its own DataPipe experiment, so condition assignment is balanced
+*within* a version. Previously all of them shared one experiment and drew from a
+single counter, so **check the condition split per version, not pooled**, in any
+data collected before 2026-10-20.
 
 ## `two-prong/` hides the improvement
 
@@ -102,8 +113,10 @@ and regresses self-rating on that slope with condition as a covariate.
 
 - **Moving-target speed is a guess.** `PERIOD_MS: 4200`, `AMPLITUDE: 3.2`. The
   ring crosses ~2 units in half a second — possibly too fast to aim at. Pilot it.
-- **All versions share DataPipe `l4vuPmnrCh5F`.** The new folders need their own
-  project before real participants, or data pools and assignment drifts.
+- **`NUM_CONDITIONS` must match each DataPipe dashboard.** If the dashboard
+  declares fewer conditions than the code lists, DataPipe only ever hands out the
+  lower indices and the extra conditions are never assigned — silently. Nothing
+  errors; the arm just never appears in your data.
 - **Aim and power aren't independent.** `power` uses the full 2-D drag length, so
   pulling sideways adds power too — a confound in any slope fit to `real_dist`.
 - **`fail_side` labels are mirrored** vs. the screen (they follow VR's frame).
@@ -111,4 +124,3 @@ and regresses self-rating on that slope with condition as a covariate.
 - **Questionnaire drift:** `Improvement-*` ask perceived study purpose where
   `two-prong` asks the manipulation check, so suspicion isn't comparable and the
   exported `.txt` fields are renumbered.
-

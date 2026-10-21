@@ -91,10 +91,13 @@ const PROLIFIC_REDIRECT_URL = "https://app.prolific.com/submissions/complete?cc=
 const BT_CONFIG = {
   practiceThrows: 2,
   TESTING: false,                // false = pilot (no picker/replay). true = testing picker.
-  DATAPIPE_ID: "l4vuPmnrCh5F",   // DataPipe experiment ID (OSF project j8fxt)
-  NUM_CONDITIONS: 2               // improvement/stochastic only — update DataPipe's
-                                   // project setting to match, or balanced assignment
-                                   // will drift (see assignCondition() fallback)
+  // Migrated off OSF 2026-10-20: DataPipe stops writing to OSF after 2026-11-16
+  // and its OSF authorization has already expired. Now a Google Drive experiment.
+  DATAPIPE_ID: "AYn3jtbYU1Ta",
+  NUM_CONDITIONS: 3               // improvement/stochastic/unmanipulated. MUST match the
+                                   // "number of conditions" setting on the DataPipe
+                                   // dashboard — if the dashboard is lower, the extra
+                                   // conditions are simply never assigned, silently.
 };
 // auto participant id: clean local timestamp so files sort in play order and
 // never collide. Format: BT_WEB_YYYYMMDD_HHMMSS_<rand> (e.g. BT_WEB_20260724_1532_ab3)
@@ -128,7 +131,7 @@ window.addEventListener('roundtable:ready', function(){
 
 // unmanipulated is intentionally excluded from real-participant assignment
 // (kept in STRUCTURES/the testing picker for dev use, just not balanced-assigned).
-const CONDITIONS = ["improvement","stochastic"];
+const CONDITIONS = ["improvement","stochastic","unmanipulated"];
 const STRUCTURES = { improvement:"FFFSSSS", stochastic:"SSFFSFS", unmanipulated:"UUUUUUU" };
 
 

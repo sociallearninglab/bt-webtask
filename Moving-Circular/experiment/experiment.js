@@ -58,6 +58,28 @@
   ==========================================================================
 */
 
+/*
+  U-TRIAL FIDELITY (2026-10-20)
+  -----------------------------
+  On an unmanipulated trial the ball lands where the throw put it and then rolls
+  forward, decelerating, until it stops. That matches VR: there, once the ball
+  touches down, per-frame velocity damping scaled by distance-from-landing slows
+  it until it comes to rest somewhere ahead of the landing point.
+
+  VR also computes a "deceleration point" 3 m BEHIND the landing and logs it, but
+  the ball never reaches it — it is already past that point when it touches down,
+  and the physics loop uses only the landing itself as the damping reference. The
+  trial is recorded once velocity stays below threshold for 5 frames, writing
+  whatever position the ball actually stopped at. The logged DECELERATION POINT
+  is therefore a reference, not a resting place.
+
+  What DID differ: VR measures EUCLIDEAN DISTANCE FROM ORIGIN at the ball's final
+  resting position; the web measured it at the touchdown point, before the roll.
+  `rest_dist` now records the resting position's distance on every trial, and the
+  exported U/warmup blocks use it. On coerced trials the ball rests on the target,
+  so rest_dist == dist_from_center there by construction.
+*/
+
 /* ===================== COERCION ENGINE (port of TrialManager) ===================== */
 const SUCCESS_ZONE_SIZES = [1.2, 0.9, 0.6, 0.3];
 // CHANGE 2: fixed distance-from-center for the 1st..4th success, in place of
@@ -141,10 +163,13 @@ const BT_CONFIG = {
   // landing is logged for everyone regardless (real_x/real_y/real_dist) — only
   // the on-screen ghost is gated.
   GHOST_BALL: false,
-  DATAPIPE_ID: "l4vuPmnrCh5F",   // DataPipe experiment ID (OSF project j8fxt)
-  NUM_CONDITIONS: 2               // improvement/stochastic only — update DataPipe's
-                                   // project setting to match, or balanced assignment
-                                   // will drift (see assignCondition() fallback)
+  // DataPipe experiment for this variant, Google Drive storage. (The old OSF
+  // experiment l4vuPmnrCh5F is retired — DataPipe stops writing to OSF after
+  // 2026-11-16 and cannot create new experiments there.)
+  DATAPIPE_ID: "6FWLEY6CQGNF",
+  NUM_CONDITIONS: 2               // improvement/stochastic. MUST match the "number of
+                                   // conditions" setting on the DataPipe dashboard, or
+                                   // balanced assignment will drift
 };
 // auto participant id: clean local timestamp so files sort in play order and
 // never collide. Format: BT_WEB_YYYYMMDD_HHMMSS_<rand> (e.g. BT_WEB_20260724_1532_ab3)
@@ -961,13 +986,15 @@ function buildVRText(){
     // CHANGE 3: the uncoerced counterfactual, logged on every trial.
     const realPt=`[${r.real_x!=null?r.real_x:''}, ${r.real_y!=null?r.real_y:''}, 0]`;
     const realD=(r.real_dist!=null?r.real_dist:'');
+    // VR measures the unmanipulated distance at the RESTING position, not touchdown
+    const restD=(r.rest_dist!=null?r.rest_dist:dist);
     if(!r.recorded){
       warmN++;
       out+=`WARMUP ${warmN}: UNMANIPULATED${CRLF}`;
       out+=`NATURAL LANDING POINT: ${landPt}${CRLF}`;
       out+=`DECELERATION POINT: ${landPt}${CRLF}`;
       out+=`ACTUAL FINAL POSITION: ${finalPt}${CRLF}`;
-      out+=`EUCLIDEAN DISTANCE FROM ORIGIN: ${dist}${CRLF}${CRLF}`;
+      out+=`EUCLIDEAN DISTANCE FROM ORIGIN: ${restD}${CRLF}${CRLF}`;
     } else {
       recN++;
       if(r.throw_type==='S'){
@@ -993,7 +1020,7 @@ function buildVRText(){
         out+=`NATURAL LANDING POINT: ${landPt}${CRLF}`;
         out+=`DECELERATION POINT: ${landPt}${CRLF}`;
         out+=`ACTUAL FINAL POSITION: ${finalPt}${CRLF}`;
-        out+=`EUCLIDEAN DISTANCE FROM ORIGIN: ${dist}${CRLF}${CRLF}`;
+        out+=`EUCLIDEAN DISTANCE FROM ORIGIN: ${restD}${CRLF}${CRLF}`;
       }
     }
   });
@@ -1488,6 +1515,13 @@ function makeThrowTrial({isPractice, label}){
             ring_period_ms: TARGET_MOTION.PERIOD_MS,
             ring_amplitude: TARGET_MOTION.AMPLITUDE,          // configured
             ring_amplitude_effective: +RING_AMPLITUDE.toFixed(3), // after bounding
+            // Distance of the RESTING position from the target centre. VR measures
+            // its EUCLIDEAN DISTANCE FROM ORIGIN here, not at touchdown. On coerced
+            // trials this equals dist_from_center (the ball rests on the target); on
+            // U trials it is the touchdown plus the forward roll.
+            rest_dist: +Math.hypot(
+                (res.finalPoint? res.finalPoint.x : res.landing.x),
+                (res.finalPoint? res.finalPoint.y : res.landing.y)).toFixed(3),
             aim:+res.aim.toFixed(3), power:+res.power.toFixed(3),
             hold_ms: res.holdMs,                          // time the ball was held/pulled before release
             zone_size:(!isPractice && type==='S')?SESSION.trialManager.getSuccessZoneSize():null,

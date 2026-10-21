@@ -106,8 +106,10 @@ const BT_CONFIG = {
   // here will land in the same OSF project as two-prong and
   // Improvement-LargeTarget. Update before running real participants if that's
   // not desired.
-  DATAPIPE_ID: "l4vuPmnrCh5F",
-  NUM_CONDITIONS: 1                // locked to improvement only for this variant
+  // Migrated off OSF 2026-10-20: DataPipe stops writing to OSF after 2026-11-16
+  // and its OSF authorization has already expired. Now a Google Drive experiment.
+  DATAPIPE_ID: "Ugu95RqnufoA",
+  NUM_CONDITIONS: 1                // improvement only; matches the DataPipe dashboard
 };
 // auto participant id: clean local timestamp so files sort in play order and
 // never collide. Format: BT_WEB_YYYYMMDD_HHMMSS_<rand> (e.g. BT_WEB_20260724_1532_ab3)
