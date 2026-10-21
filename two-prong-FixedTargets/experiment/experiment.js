@@ -643,7 +643,18 @@ function runThrow(ctx, opts){
 
     const pr = project(gx, gd);
     const r = Math.max(4, 26*pr.scale);
-    const sy = pr.sy - r*0.4 - gh*pr.scale*140;
+    let sy = pr.sy - r*0.4 - gh*pr.scale*140;
+    // Same launch blend as the live ball. The arc's own start sits at the fork
+    // height, which is a position the ball was never at — it was pulled DOWN and
+    // back in the sling. The live ball eases from its true release point onto the
+    // arc over the first 18% of flight; without the same easing the ghost would
+    // begin ~100 px too high and visibly separate from the ball on a U trial,
+    // where the two are by definition the same throw. Lateral needs no blend:
+    // flightStart.x already is the real release x (measured separation 0.00 px).
+    if(releaseScreen && t < T.FLIGHT_MS*0.18){
+      const b = (t/T.FLIGHT_MS)/0.18;              // 0..1 across the blend window
+      sy = releaseScreen.y + (sy - releaseScreen.y)*b;
+    }
     ctx.save();
     ctx.globalAlpha = 0.45;
     ctx.beginPath(); ctx.arc(pr.sx, sy, r, 0, 2*Math.PI);
