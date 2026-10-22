@@ -3,27 +3,59 @@
 Web port of the VR ball-throwing task. Social Learning Lab @ Stanford.
 Each folder is a deployable version; Pages serves it from its own `index.html`.
 
-| Folder | Conditions | DataPipe ID | What it is |
-|---|---|---|---|
-| `two-prong/` | impr, stoch, unmanip | `AYn3jtbYU1Ta` | The original. slight issue see below |
-| `two-prong-FixedTargets/` | impr, stoch, unmanip | `t7Lbeug3gFex` | `two-prong` with fixed coerced distances, the VR roll, and a debug ghost ball. |
-| `Improvement-LargeTarget/` | improvement | `sfqHienbSxWY` | Visual ring radius 1.2. |
-| `Improvement-SmallTarget/` | improvement | `Ugu95RqnufoA` | Visual ring radius 0.24. |
-| `Improvement-NoWobble/` | improvement, stochastic | `TQv19MRhosQL` | Catapult wobble disabled. |
-| `Moving-Linear/` | improvement, stochastic | `u9ylMYCjkVy4` | Ring sweeps left–right. Speed not calibrated. |
-| `Moving-Circular/` | improvement, stochastic | `6FWLEY6CQGNF` | Ring orbits. Speed not calibrated. |
-| `analysis/` | — | — | Skill-slope fit and self-rating models. |
+| Path | What it is |
+|---|---|
+| `task/` | **The experiment.** One file; the arm is chosen by `?v=` (see below). |
+| `analysis/` | Skill-slope fit and self-rating models. |
+| *(removed)* | The seven old per-variant folders were deleted when `task/` replaced them. |
 
-All seven write to **Google Drive** via DataPipe. The old OSF experiment
-`l4vuPmnrCh5F` is retired: DataPipe can no longer create OSF experiments, stops
-writing to OSF after **16 November 2026**, and its OSF authorization has already
-expired — anything still pointing there collects nothing. The 84 sessions already
-on OSF are unaffected and stay in the OSF account.
+The old folders — `two-prong`, `two-prong-FixedTargets`,
+`Improvement-LargeTarget/SmallTarget/NoWobble`, `Moving-Linear`,
+`Moving-Circular` — are permanently available at commit
+[`93a15a5`](https://github.com/sociallearninglab/bt-webtask/tree/93a15a5),
+which is the exact code that produced every dataset collected before
+2026-10-22. Their DataPipe experiments should have data collection switched off,
+so a stale link 404s rather than quietly collecting into a dead arm.
 
-Each version has its own DataPipe experiment, so condition assignment is balanced
-*within* a version. Previously all of them shared one experiment and drew from a
-single counter, so **check the condition split per version, not pooled**, in any
-data collected before 2026-10-20.
+## Running it
+
+```
+/task/experiment/?v=fixed
+/task/experiment/?v=moving-linear
+/task/experiment/?v=small-target&ghost=1
+```
+
+| `?v=` | ring | wobble | motion | replaces |
+|---|---|---|---|---|
+| `fixed` *(default)* | 1.2 dashed | on | – | two-prong, two-prong-FixedTargets |
+| `large-target` | 1.2 solid | on | – | Improvement-LargeTarget |
+| `small-target` | 0.24 solid | on | – | Improvement-SmallTarget |
+| `no-wobble` | 1.2 dashed | **off** | – | Improvement-NoWobble |
+| `moving-linear` | 1.2 dashed | on | sweeps left–right | Moving-Linear |
+| `moving-circular` | 1.2 dashed | on | orbits | Moving-Circular |
+
+An unknown or missing `?v=` falls back to `fixed`. The arm is recorded in every
+data row (`variant`, plus `ring_radius` / `ring_dashed` / `wobble_mult`) and
+appended to both uploaded filenames, so one pooled storage folder stays readable.
+
+All variants share **one DataPipe experiment**. The trade-off, taken
+deliberately: DataPipe's balancing counter is per-experiment, so variants draw
+from a single rotation rather than each being balanced internally. Fine for
+exploratory runs — a preregistered sample needing true counterbalancing should
+get its own experiment ID.
+
+**`DATAPIPE_ID` is currently the placeholder `REPLACE_ME_POOLED_ID`.** Nothing
+uploads until it is set.
+
+### What consolidating dropped
+
+Every variant now runs one engine. The sampled-target path and
+`HIT_DIST_BY_ORDINAL` (the older visual-hit scheduler the two target-size arms
+used) were deleted rather than kept as switches, so `large-target` and
+`small-target` now get fixed coerced distances, the VR roll, `real_dist` /
+`rest_dist`, the ghost, and the manipulation check in place of the
+study-purpose question. The old folders are unchanged, so previously collected
+data still matches the code that produced it.
 
 ## `two-prong/` hides the improvement
 
