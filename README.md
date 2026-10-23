@@ -20,21 +20,24 @@ so a stale link 404s rather than quietly collecting into a dead arm.
 ## Running it
 
 ```
-/task/experiment/?v=fixed
+/task/experiment/?v=baseline
 /task/experiment/?v=moving-linear
 /task/experiment/?v=small-target&ghost=1
 ```
 
 | `?v=` | ring | wobble | motion | replaces |
 |---|---|---|---|---|
-| `fixed` *(default)* | 1.2 dashed | on | – | two-prong, two-prong-FixedTargets |
+| `baseline` *(default)* | 1.2 dashed | on | – | two-prong, two-prong-FixedTargets |
 | `large-target` | 1.2 solid | on | – | Improvement-LargeTarget |
 | `small-target` | 0.24 solid | on | – | Improvement-SmallTarget |
 | `no-wobble` | 1.2 dashed | **off** | – | Improvement-NoWobble |
 | `moving-linear` | 1.2 dashed | on | sweeps left–right | Moving-Linear |
 | `moving-circular` | 1.2 dashed | on | orbits | Moving-Circular |
 
-An unknown or missing `?v=` falls back to `fixed`. The arm is recorded in every
+Omitting `?v=` runs `baseline`. An **unknown** `?v=` is a hard error — the task
+refuses to run and shows which values are valid, so a typo in a recruitment link
+cannot quietly collect an arm's worth of data under the wrong condition. The arm
+is recorded in every
 data row (`variant`, plus `ring_radius` / `ring_dashed` / `wobble_mult`) and
 appended to both uploaded filenames, so one pooled storage folder stays readable.
 

@@ -107,8 +107,8 @@
                  Scales the visual rock and the aim perturbation together.
      motion      null | 'linear' | 'circular' - how the ring travels. */
 const VARIANTS = {
-  'fixed':           { ringRadius:1.20, ringDashed:true,  wobble:1, motion:null,
-                       note:'baseline; replaces two-prong and two-prong-FixedTargets' },
+  'baseline':        { ringRadius:1.20, ringDashed:true,  wobble:1, motion:null,
+                       note:'static ring; replaces two-prong and two-prong-FixedTargets' },
   'large-target':    { ringRadius:1.20, ringDashed:false, wobble:1, motion:null,
                        note:'replaces Improvement-LargeTarget' },
   'small-target':    { ringRadius:0.24, ringDashed:false, wobble:1, motion:null,
@@ -120,11 +120,33 @@ const VARIANTS = {
   'moving-circular': { ringRadius:1.20, ringDashed:true,  wobble:1, motion:'circular',
                        note:'ring orbits on the ground plane; replaces Moving-Circular' }
 };
-const DEFAULT_VARIANT = 'fixed';
+const DEFAULT_VARIANT = 'baseline';
 
+/* Resolving ?v= — deliberately asymmetric:
+     absent  -> DEFAULT_VARIANT, so a bare URL still runs for casual testing
+     unknown -> hard stop with an error screen
+   A typo in a recruitment link (?v=movinglinear) must NOT quietly run the
+   baseline: it would collect a whole arm's worth of data under the wrong
+   condition and only show up in the `variant` column after the fact. */
 const VARIANT_KEY = (function(){
   const q = new URLSearchParams(window.location.search).get('v');
-  return (q && Object.prototype.hasOwnProperty.call(VARIANTS, q)) ? q : DEFAULT_VARIANT;
+  if(q === null || q === '') return DEFAULT_VARIANT;
+  if(Object.prototype.hasOwnProperty.call(VARIANTS, q)) return q;
+  const valid = Object.keys(VARIANTS).join(', ');
+  document.addEventListener('DOMContentLoaded', function(){
+    document.body.innerHTML =
+      '<div style="max-width:620px;margin:80px auto;padding:28px;border:2px solid #c0392b;'+
+      'border-radius:10px;font:16px/1.55 system-ui,sans-serif;color:#12240f;background:#fff5f4;">'+
+      '<h2 style="margin:0 0 12px;color:#c0392b;">Unknown variant</h2>'+
+      '<p style="margin:0 0 10px;">The link asked for <code style="background:#fff;padding:2px 6px;'+
+      'border-radius:4px;">?v=' + String(q).replace(/[<>&"]/g, '') + '</code>, which is not an '+
+      'experiment variant, so nothing has been run and no data recorded.</p>'+
+      '<p style="margin:0 0 10px;">Valid values: <code style="background:#fff;padding:2px 6px;'+
+      'border-radius:4px;">' + valid + '</code></p>'+
+      '<p style="margin:0;color:#6b7f66;font-size:14px;">Omitting <code>?v=</code> entirely runs '+
+      'the default (<b>' + DEFAULT_VARIANT + '</b>).</p></div>';
+  });
+  throw new Error('Unknown variant "' + q + '". Valid: ' + valid);
 })();
 const V = VARIANTS[VARIANT_KEY];
 
