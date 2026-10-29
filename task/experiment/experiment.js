@@ -234,16 +234,15 @@ const BT_CONFIG = {
   // the on-screen ghost is gated.
   GHOST_BALL: false,
   // ---- POOLED DataPipe experiment (Google Drive storage) ----------------
-  // PLACEHOLDER. Every variant writes to this ONE experiment; the arm is
-  // recorded in the `variant` column and in the uploaded filenames instead of
-  // being separated by experiment. Replace with the real pooled ID before
-  // running participants.
+  // Every variant writes to this ONE experiment; the arm is recorded in the
+  // `variant` column and in the uploaded filenames instead of being separated
+  // by experiment.
   //
   // Consequence of pooling, accepted deliberately: DataPipe's balancing counter
   // is per-experiment, so all variants draw from a single rotation rather than
   // each being balanced internally. Fine for exploratory runs; a preregistered
   // sample that needs true counterbalancing should get its own experiment ID.
-  DATAPIPE_ID: "REPLACE_ME_POOLED_ID",
+  DATAPIPE_ID: "cQu9bNMln6J8",
   NUM_CONDITIONS: 3               // improvement/stochastic/unmanipulated. MUST match the
                                    // "number of conditions" setting on the DataPipe
                                    // dashboard, or assignment drifts.
@@ -1562,7 +1561,8 @@ function makeThrowTrial({isPractice, label}){
     on_load: function(){
       const canvas=document.getElementById('bt-field'), ctx=canvas.getContext('2d');
       resetRingForTrial();     // MOVING TARGET: new phase (and depth) per trial
-      document.getElementById('bt-status').textContent = isPractice ? 'Practice throw' : 'Throw as close to the moving target as you can';
+      document.getElementById('bt-status').textContent = isPractice ? 'Practice throw'
+        : V.motion ? 'Throw as close to the moving target as you can' : 'Throw as close to the center as you can';
       const type = isPractice ? 'PRACTICE' : SESSION.trialManager.getCurrentTrialType();
 
       // Decide the landing at release, from the participant's control.
@@ -1839,7 +1839,7 @@ function buildRun(){
   if(BT_CONFIG.TESTING){ tl.push(conditionPicker); }
   tl.push(intro, fieldPreview, practiceExplainer, mechExplain1, mechExplain2, mechExplain3);
   for(let i=0;i<BT_CONFIG.practiceThrows;i++) tl.push(makeThrowTrial({isPractice:true}));
-  tl.push({type:jsPsychHtmlButtonResponse,stimulus:panel(`<p>The target <b>moves</b>. Throw the ball as close to the <b>center</b> of the target as you can.</p>`),
+  tl.push({type:jsPsychHtmlButtonResponse,stimulus:panel(`<p>${V.motion ? 'The target <b>moves</b>. ' : ''}Throw the ball as close to the <b>center</b> of the target as you can.</p>`),
     choices:['Continue'], ...readGate()});
   for(let i=0;i<NUM_THROWS;i++) tl.push(makeThrowTrial({isPractice:false}));
   tl.push(relativeSkill, magnitude, manipCheck, manipWhat, demographicsTrial, debrief);

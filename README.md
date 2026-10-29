@@ -47,8 +47,7 @@ from a single rotation rather than each being balanced internally. Fine for
 exploratory runs — a preregistered sample needing true counterbalancing should
 get its own experiment ID.
 
-**`DATAPIPE_ID` is currently the placeholder `REPLACE_ME_POOLED_ID`.** Nothing
-uploads until it is set.
+The pooled DataPipe experiment ID is `cQu9bNMln6J8`.
 
 ### What consolidating dropped
 
