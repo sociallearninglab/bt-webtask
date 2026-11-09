@@ -157,10 +157,17 @@ const SUCCESS_ZONE_SIZES = [1.2, 0.9, 0.6, 0.3];
 // code sampled from, so the mean spacing of the improvement sequence is
 // unchanged — only the per-trial variance is removed.
 const SUCCESS_TARGET_DISTS = [1.05, 0.75, 0.45, 0.15];
-const FAILURE_ZONE_RIGHT_X_RANGE = [-5, -4];
-const FAILURE_ZONE_LEFT_X_RANGE  = [ 4,  5];
+const FAILURE_ZONE_RIGHT_X_RANGE = [-5, -4];   // retained: documents the VR zones
+const FAILURE_ZONE_LEFT_X_RANGE  = [ 4,  5];   // the original distances derived from
 const FAILURE_ZONE_Y_RANGE = [-1.5, 1.5];
 const SHIFT_PER_FAILURE = 0.5;
+// Fixed distance-from-centre for the 1st..3rd failure, replacing the old
+// shift-the-zone-inward derivation (which produced 4.0/3.5/3.0). Pushed out by
+// 1.5 units on 2026-11-09 so a coerced miss reads as unambiguously missed.
+// Side is still chosen by throw direction, exactly as in VR; only the magnitude
+// is fixed. Ceiling is the field clamp at +-6.7 — see MAX_TARGET_OFFSET, which
+// derives the moving-ring amplitude cap from whatever is set here.
+const FAILURE_TARGET_DISTS = [5.5, 5.0, 4.5];
 // VR's LANDING_OFFSET: on a coerced trial the ball first touches down this far
 // SHORT of the target along the throw line, then rolls the rest of the way and
 // stops on it. Direct port of the VR constant.
@@ -170,6 +177,15 @@ function uniform(a,b){return a + Math.random()*(b-a);}
 class TrialManager{
   constructor(structure,condition){
     this.structure=structure; this.condition=condition;
+    /* DISIMPROVEMENT is the exact time-reverse of improvement, which takes more
+       than reversing the trial string. Distances are keyed to ordinal WITHIN
+       type, so a plain SSSSFFF would still tighten its successes and close in
+       its failures — it would read as improvement, reordered. Reversing the
+       schedules as well gives the true mirror:
+
+         improvement     F5.5  F5.0  F4.5  S1.05 S0.75 S0.45 S0.15
+         disimprovement  S0.15 S0.45 S0.75 S1.05 F4.5  F5.0  F5.5          */
+    this.reversed = (condition === 'disimprovement');
     this.currentTrial=0; this.trialCount=0;
     this.successZoneSizes=SUCCESS_ZONE_SIZES;
     this.initR=FAILURE_ZONE_RIGHT_X_RANGE.slice();
@@ -178,7 +194,9 @@ class TrialManager{
   }
   getCurrentTrialType(){return this.currentTrial>=this.structure.length?null:this.structure[this.currentTrial];}
   _count(ch){let n=0;for(let i=0;i<=this.currentTrial&&i<this.structure.length;i++)if(this.structure[i]===ch)n++;return n;}
-  getSuccessZoneSize(){const c=this._count('S');return this.successZoneSizes[Math.min(c-1,this.successZoneSizes.length-1)];}
+  // index into an ordinal-keyed schedule, mirrored for disimprovement
+  _schedIdx(count, len){ return this.reversed ? Math.max(0, len-count) : Math.min(count,len)-1; }
+  getSuccessZoneSize(){const c=this._count('S');return this.successZoneSizes[this._schedIdx(c,this.successZoneSizes.length)];}
   getFailureZoneRanges(){
     const fc=this._count('F');
     const maxShift=Math.min(Math.abs(this.initR[1])-1.0, Math.abs(this.initL[0])-1.0);
@@ -199,16 +217,20 @@ class TrialManager{
       // center, which is the measured quantity, is identical across participants.
       const angle=uniform(0,2*Math.PI);
       const c=this._count('S');
-      const radius=SUCCESS_TARGET_DISTS[Math.min(c,SUCCESS_TARGET_DISTS.length)-1];
+      const radius=SUCCESS_TARGET_DISTS[this._schedIdx(c,SUCCESS_TARGET_DISTS.length)];
       return {x:radius*Math.cos(angle), y:radius*Math.sin(angle), z:0};
     }else{
       // CHANGE 2: failures are fixed too. x is the MIDPOINT of the current
       // (shift-adjusted) failure zone rather than a uniform draw across it, and
       // y sits level with the ring center rather than uniform in [-1.5, 1.5].
       // Which SIDE is still chosen by throw direction, exactly as in VR.
-      const {right,left}=this.getFailureZoneRanges();
-      const zone = throwDirX<0 ? right : left;
-      const x = (zone[0]+zone[1])/2;
+      // Failures are fixed too: the magnitude comes from FAILURE_TARGET_DISTS by
+      // failure ordinal (mirrored for disimprovement), and y sits level with the
+      // ring centre. Which SIDE is still chosen by throw direction, as in VR
+      // (negative x = VR's "RIGHT").
+      const fc=this._count('F');
+      const dist=FAILURE_TARGET_DISTS[this._schedIdx(fc,FAILURE_TARGET_DISTS.length)];
+      const x = (throwDirX<0 ? -1 : 1) * dist;
       const y = (this.failY[0]+this.failY[1])/2;    // = 0
       return {x,y,z:0};
     }
@@ -243,7 +265,7 @@ const BT_CONFIG = {
   // each being balanced internally. Fine for exploratory runs; a preregistered
   // sample that needs true counterbalancing should get its own experiment ID.
   DATAPIPE_ID: "cQu9bNMln6J8",
-  NUM_CONDITIONS: 3               // improvement/stochastic/unmanipulated. MUST match the
+  NUM_CONDITIONS: 4               // improvement/disimprovement/stochastic/unmanipulated. MUST match the
                                    // "number of conditions" setting on the DataPipe
                                    // dashboard, or assignment drifts.
                                    // conditions" setting on the DataPipe dashboard, or
@@ -291,8 +313,9 @@ window.addEventListener('roundtable:ready', function(){
 
 // unmanipulated is intentionally excluded from real-participant assignment
 // (kept in STRUCTURES/the testing picker for dev use, just not balanced-assigned).
-const CONDITIONS = ["improvement","stochastic","unmanipulated"];
-const STRUCTURES = { improvement:"FFFSSSS", stochastic:"SSFFSFS", unmanipulated:"UUUUUUU" };
+const CONDITIONS = ["improvement","disimprovement","stochastic","unmanipulated"];
+const STRUCTURES = { improvement:"FFFSSSS", disimprovement:"SSSSFFF",
+                     stochastic:"SSFFSFS", unmanipulated:"UUUUUUU" };
 
 
 /* -------------------------------------------------------------------------
@@ -397,8 +420,8 @@ const TARGET_MOTION = {
    from the engine constants rather than hard-coded, so retuning the zones or the
    shift cannot silently reintroduce the problem. */
 const MAX_TARGET_OFFSET = Math.max(
-  SUCCESS_TARGET_DISTS[0],
-  Math.abs((FAILURE_ZONE_LEFT_X_RANGE[0]+FAILURE_ZONE_LEFT_X_RANGE[1])/2 - SHIFT_PER_FAILURE)
+  Math.max.apply(null, SUCCESS_TARGET_DISTS),
+  Math.max.apply(null, FAILURE_TARGET_DISTS)
 );
 const MAX_RING_X = (VIEW.worldHalfX - 0.3) - MAX_TARGET_OFFSET;
 const RING_D_MIN = (THROWER_D + 0.3) + MAX_TARGET_OFFSET;
@@ -1337,7 +1360,7 @@ const conditionPicker={type:jsPsychHtmlButtonResponse,
     <p style="color:#4a5a46;font-size:13px;">Variant: <b>${VARIANT_KEY}</b></p>
     <p>For piloting only. "Random (blind)" secretly picks one of the three so you
     can test without knowing which. The true condition is still recorded in the data.</p>`),
-  choices:['Improvement','Stochastic','Unmanipulated','Random (blind)'],
+  choices:['Improvement','Disimprovement','Stochastic','Unmanipulated','Random (blind)'],
   data:{ screen:'picker' },
   on_finish:(d)=>{
     const map=['improvement','stochastic','unmanipulated'];
