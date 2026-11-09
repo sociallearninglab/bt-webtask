@@ -41,6 +41,10 @@ is recorded in every
 data row (`variant`, plus `ring_radius` / `ring_dashed` / `wobble_mult`) and
 appended to both uploaded filenames, so one pooled storage folder stays readable.
 
+There are now **four conditions** (improvement, disimprovement, stochastic,
+unmanipulated), so the DataPipe dashboard's "number of conditions" must be set
+to **4** to match `NUM_CONDITIONS`.
+
 All variants share **one DataPipe experiment**. The trade-off, taken
 deliberately: DataPipe's balancing counter is per-experiment, so variants draw
 from a single rotation rather than each being balanced internally. Fine for
@@ -97,8 +101,23 @@ both `Moving-*`):
 
 | | t1 | t2 | t3 | t4 | t5 | t6 | t7 |
 |---|---|---|---|---|---|---|---|
-| improvement `FFFSSSS` | F 4.0 | F 3.5 | F 3.0 | S 1.05 | S 0.75 | S 0.45 | S 0.15 |
-| stochastic `SSFFSFS` | S 1.05 | S 0.75 | F 4.0 | F 3.5 | S 0.45 | F 3.0 | S 0.15 |
+| improvement `FFFSSSS` | F 5.5 | F 5.0 | F 4.5 | S 1.05 | S 0.75 | S 0.45 | S 0.15 |
+| disimprovement `SSSSFFF` | S 0.15 | S 0.45 | S 0.75 | S 1.05 | F 4.5 | F 5.0 | F 5.5 |
+| stochastic `SSFFSFS` | S 1.05 | S 0.75 | F 5.5 | F 5.0 | S 0.45 | F 4.5 | S 0.15 |
+
+**Disimprovement is the exact time-reverse of improvement**, not just the trial
+string reversed. Distances are keyed to ordinal *within type*, so a plain
+`SSSSFFF` would still tighten its successes and close in its failures — it would
+read as improvement, reordered. The schedules are mirrored too, which is what
+makes performance visibly degrade across the session.
+
+**Failure distances were pushed out to 5.5 / 5.0 / 4.5** (from 4.0 / 3.5 / 3.0)
+on 2026-11-09, so a coerced miss reads as unambiguously missed. They now live in
+`FAILURE_TARGET_DISTS` rather than being derived from the shifting VR zones.
+Consequence for the moving arms: the ring's amplitude cap is `6.7 − 5.5 = 1.20`,
+down from 2.70, so their sweep is noticeably smaller. `MAX_TARGET_OFFSET` derives
+that automatically and the console reports it at load, so the coerced distances
+stay exact whatever you set.
 
 Angle is still random; failure side still follows the pull. These are the
 midpoints of the ranges previously sampled, so mean spacing is unchanged.
