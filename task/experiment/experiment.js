@@ -317,6 +317,31 @@ const CONDITIONS = ["improvement","disimprovement","stochastic","unmanipulated"]
 const STRUCTURES = { improvement:"FFFSSSS", disimprovement:"SSSSFFF",
                      stochastic:"SSFFSFS", unmanipulated:"UUUUUUU" };
 
+/* ===================== DEV SWITCHES =====================
+   For checking what a participant will see, without waiting on the condition
+   counter or sitting through the full intro. Both are URL parameters, so a
+   recruitment link never carries them.
+
+     ?cond=disimprovement   force a condition. Skips the DataPipe counter
+                            entirely, so a test run does NOT consume a
+                            condition from the rotation the way a normal page
+                            load does.
+     ?quick=1               skip the mic gate and the practice throws, and drop
+                            the 5-second read-gates to nothing. A full run takes
+                            about 90 seconds instead of ten minutes.
+
+   Any run using either is marked: a red banner is pinned on screen, every data
+   row carries dev_run = true, and both uploaded filenames are prefixed DEV_ so
+   test runs are obvious in the storage folder and trivial to filter out. */
+const DEV = (function(){
+  const q = new URLSearchParams(window.location.search);
+  const c = q.get('cond');
+  const quick = q.get('quick')==='1' || q.get('quick')==='true';
+  const cond = (c && Object.prototype.hasOwnProperty.call(STRUCTURES, c)) ? c : null;
+  if(c && !cond) console.warn('[dev] unknown ?cond='+c+'. Valid: '+Object.keys(STRUCTURES).join(', '));
+  return { cond, quick, on: !!(cond || quick) };
+})();
+
 
 /* -------------------------------------------------------------------------
    SLINGSHOT / CATAPULT THROW — same across ALL conditions:
@@ -1123,6 +1148,7 @@ function buildVRText(){
   const struct=SESSION.structure||"";
   let out=`PARTICIPANT: ${BT_CONFIG.participant}${CRLF}`;
   out+=`VARIANT: ${VARIANT_KEY}${CRLF}`;
+  if(DEV.on) out+=`DEV RUN: yes${DEV.cond?' (condition forced to '+DEV.cond+')':''}${CRLF}`;
   if(PROLIFIC_PARAMS.prolific_pid){
     out+=`PROLIFIC_PID: ${PROLIFIC_PARAMS.prolific_pid}${CRLF}STUDY_ID: ${PROLIFIC_PARAMS.study_id}${CRLF}SESSION_ID: ${PROLIFIC_PARAMS.session_id}${CRLF}`;
   }
@@ -1227,7 +1253,7 @@ function makeSaveTrial(){
     type: jsPsychPipe,
     action: "save",
     experiment_id: BT_CONFIG.DATAPIPE_ID,
-    filename: ()=>`${BT_CONFIG.participant}_${VARIANT_KEY}.txt`,
+    filename: ()=>`${DEV.on?'DEV_':''}${BT_CONFIG.participant}_${VARIANT_KEY}.txt`,
     data_string: ()=>buildVRText()
   };
 }
@@ -1236,7 +1262,7 @@ function makeRawSaveTrial(){
     type: jsPsychPipe,
     action: "save",
     experiment_id: BT_CONFIG.DATAPIPE_ID,
-    filename: ()=>`${BT_CONFIG.participant}_${VARIANT_KEY}.csv`,
+    filename: ()=>`${DEV.on?'DEV_':''}${BT_CONFIG.participant}_${VARIANT_KEY}.csv`,
     data_string: ()=>jsPsych.data.get().csv()
   };
 }
@@ -1329,7 +1355,7 @@ function panel(html){ return `<div class="bt-panel bt-instructions">${html}</div
    participants can't skip past without reading. Shows a live countdown on the
    button, then restores the real label and re-enables. Returned object is spread
    into a jsPsychHtmlButtonResponse trial (adds on_load; leaves everything else). */
-const READ_GATE_MS = 5000;
+const READ_GATE_MS = DEV.quick ? 0 : 5000;
 function readGate(){
   return {
     on_load: function(){
@@ -1636,6 +1662,8 @@ function makeThrowTrial({isPractice, label}){
             trial_kind: 'throw',
             participant: BT_CONFIG.participant,
             variant: VARIANT_KEY,                         // which arm this run is
+            dev_run: DEV.on,                              // true = a ?cond= / ?quick= test run
+            dev_forced_condition: DEV.cond || null,
             ring_radius: V.ringRadius,
             ring_dashed: V.ringDashed,
             wobble_mult: V.wobble,
@@ -1861,7 +1889,8 @@ function buildRun(){
   const tl=[];
   if(BT_CONFIG.TESTING){ tl.push(conditionPicker); }
   tl.push(intro, fieldPreview, practiceExplainer, mechExplain1, mechExplain2, mechExplain3);
-  for(let i=0;i<BT_CONFIG.practiceThrows;i++) tl.push(makeThrowTrial({isPractice:true}));
+  const nPractice = DEV.quick ? 0 : BT_CONFIG.practiceThrows;
+  for(let i=0;i<nPractice;i++) tl.push(makeThrowTrial({isPractice:true}));
   tl.push({type:jsPsychHtmlButtonResponse,stimulus:panel(`<p>${V.motion ? 'The target <b>moves</b>. ' : ''}Throw the ball as close to the <b>center</b> of the target as you can.</p>`),
     choices:['Continue'], ...readGate()});
   for(let i=0;i<NUM_THROWS;i++) tl.push(makeThrowTrial({isPractice:false}));
@@ -1880,7 +1909,9 @@ const replayLoop={
   }
 };
 
-const timeline=[consentTrial, ...(BT_CONFIG.TESTING ? [] : [micTestTrial]), replayLoop];
+const timeline=[consentTrial,
+  ...((BT_CONFIG.TESTING || DEV.quick) ? [] : [micTestTrial]),
+  replayLoop];
 
 // Startup: in pilot mode, assign a (balanced) condition BEFORE running. In testing
 // mode, the picker sets the condition instead.
@@ -1894,10 +1925,34 @@ async function startExperiment(){
     return;
   }
 
+  // ?cond= forces a condition WITHOUT calling DataPipe, so a test run leaves the
+  // balancing counter untouched. (A normal page load consumes an index whether
+  // or not the participant finishes.)
+  if(DEV.cond){
+    console.info('[dev] forced condition: '+DEV.cond+(DEV.quick?' (quick mode)':''));
+    initSession(DEV.cond, false);
+    jsPsych.run(timeline);
+    return;
+  }
   if(!BT_CONFIG.TESTING){
     const cond = await assignCondition();
     initSession(cond, false);
   }
   jsPsych.run(timeline);
 }
+if(DEV.on){
+  window.addEventListener('DOMContentLoaded', function(){
+    const b = document.createElement('div');
+    b.textContent = 'DEV RUN — ' +
+      (DEV.cond ? 'condition forced to ' + DEV.cond : 'condition assigned normally') +
+      (DEV.quick ? ' · quick mode (no mic gate, no practice)' : '') +
+      ' · data tagged dev_run and filed under DEV_';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#c0392b;'+
+      'color:#fff;font:600 13px system-ui,sans-serif;padding:7px 12px;text-align:center;'+
+      'letter-spacing:.3px;';
+    document.body.appendChild(b);
+    document.documentElement.style.scrollPaddingTop = '34px';
+  });
+}
+
 startExperiment();
