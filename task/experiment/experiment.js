@@ -127,8 +127,9 @@ const VARIANTS = {
   /* Deliberately named so the URL gives nothing away — the condition this pins
      is in the code, not the link a participant sees. */
   'zones':           { ringRadius:1.20, ringDashed:true,  wobble:1, motion:null,
-                       sampledZones:true, forceCondition:'stochastic',
-                       note:'old sampled zones; condition pinned in code' }
+                       sampledZones:true, originalRoll:true, forceCondition:'stochastic',
+                       note:'the full pre-2026-10 paradigm: sampled zones AND the ' +
+                            'original roll; condition pinned in code' }
 };
 const DEFAULT_VARIANT = 'baseline';
 
@@ -667,8 +668,9 @@ function drawBall3D(ctx, x, d, airH){
   ctx.beginPath(); ctx.arc(p.sx, cy, r, 0,2*Math.PI);
   ctx.fillStyle=ballGradient(ctx, p.sx, cy, r); ctx.fill();
   ctx.strokeStyle='#8e1b18'; ctx.lineWidth=Math.max(1,2*p.scale); ctx.stroke();
-  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=Math.max(1,1.5*p.scale);
-  ctx.beginPath(); ctx.ellipse(p.sx, cy, r*0.55, r, 0,0,2*Math.PI); ctx.stroke();
+  // (the white "seam" ellipse that used to be drawn here is gone: the ball in
+  //  the sling never had one, so it appeared at launch and looked like the ball
+  //  changing. One appearance throughout.)
 }
 
 /* convert an engine/real landing {x,y} into ground coords for rendering.
@@ -998,8 +1000,7 @@ function runThrow(ctx, opts){
     ctx.beginPath(); ctx.arc(sx, sy, r, 0,2*Math.PI);
     ctx.fillStyle=ballGradient(ctx, sx, sy, r); ctx.fill();
     ctx.strokeStyle='#8e1b18'; ctx.lineWidth=2; ctx.stroke();
-    ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.ellipse(sx, sy, r*0.55, r, 0,0,2*Math.PI); ctx.stroke();
+    // (no seam ellipse — see drawBall3D)
     ctx.globalAlpha=1;
   }
 
@@ -1676,15 +1677,47 @@ function makeThrowTrial({isPractice, label}){
           // real throw: skill decides, and it is shown exactly as scored.
           return { scored:real, visual:{x:real.x, y:real.y}, real };
         }
-        // coerced S/F: one point, displayed and logged; `real` rides along unseen.
         const scored = SESSION.trialManager.generateTargetPoint(aim);
+
+        /* ORIGINAL ROLL (restored verbatim from c33948a, 27 Aug 2026).
+           The pre-2026-10 build did NOT show the ball resting on the coerced
+           target. It derived a separate DISPLAYED landing — same distance from
+           centre as the scored one, but rotated to point the way the player
+           pulled — and then rolled the ball a further ROLL_DIST past it. The
+           consequence, which is the point of reproducing it: every success came
+           to rest roughly 1.5 units from centre regardless of ordinal, so the
+           improvement was never visible on screen. */
+        if(V.originalRoll){
+          const T = THROW_TUNING;
+          const intendedX = aim * T.LATERAL_MAX;
+          const scoredDist = Math.hypot(scored.x, scored.y);
+          let vx, vy;
+          if(type==='F'){
+            const sideSign = intendedX>=0 ? 1 : -1;
+            const lateralShare = Math.min(Math.abs(intendedX)/T.LATERAL_MAX, 1);
+            const baseLat = scoredDist * (0.4 + 0.45*lateralShare);
+            const wob = Math.max(-0.6*baseLat, Math.min(0.6*baseLat, noise()*T.RELEASE_NOISE));
+            vx = sideSign * (baseLat + Math.abs(wob)*Math.sign(noise()||1));
+            if(sideSign>0) vx=Math.max(vx, 0.15*scoredDist);
+            else vx=Math.min(vx, -0.15*scoredDist);
+            vy = (scored.y>=0?1:-1) * Math.sqrt(Math.max(0, scoredDist*scoredDist - vx*vx));
+          } else {
+            vx = scored.x*0.6 + intendedX*0.15 + noise()*T.RELEASE_NOISE*0.6;
+            vy = scored.y + noise()*T.RELEASE_NOISE*0.6;
+          }
+          return { scored, visual:{x:vx, y:vy}, real };
+        }
+
+        // current behaviour: one point, displayed and logged.
         return { scored, visual:{x:scored.x, y:scored.y}, real };
       }
 
       runThrow(ctx, {
         voidMode: isPractice,
         // coerced trials land short of the target and roll onto it (VR behaviour)
-        rollToTarget: (!isPractice && type!=='U'),
+        // originalRoll sends coerced trials down the same path a real throw
+        // takes: land where the displayed landing says, then roll PAST it.
+        rollToTarget: (!isPractice && type!=='U' && !V.originalRoll),
         showGhost: GHOST,          // debug only; ?ghost=1
         ghostLabel: type,
         getOutcome,
