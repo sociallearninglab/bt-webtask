@@ -124,9 +124,11 @@ const VARIANTS = {
      to stochastic, so the recruitment link carries no ?cond= and reveals nothing.
      Everything else — the VR landing offset and roll, real_dist/rest_dist, the
      ghost — stays as it is now, so the ball still rests where it was scored. */
-  'zones-stochastic':{ ringRadius:1.20, ringDashed:true,  wobble:1, motion:null,
+  /* Deliberately named so the URL gives nothing away — the condition this pins
+     is in the code, not the link a participant sees. */
+  'zones':           { ringRadius:1.20, ringDashed:true,  wobble:1, motion:null,
                        sampledZones:true, forceCondition:'stochastic',
-                       note:'old sampled zones, stochastic hardcoded' }
+                       note:'old sampled zones; condition pinned in code' }
 };
 const DEFAULT_VARIANT = 'baseline';
 
@@ -415,6 +417,17 @@ const THROW_TUNING = {
   ROLL_DIST: 1.4           // world-units the ball rolls forward past landing
 };
 
+/* One ball appearance, used everywhere. The ball used to be drawn two different
+   ways — a shaded radial gradient while it sat in the sling, then a flat fill
+   once it was in flight — so it visibly changed colour at the moment of release.
+   This paints the same shaded sphere at any radius. */
+function ballGradient(ctx, x, y, r){
+  const g = ctx.createRadialGradient(x - r*0.27, y - r*0.27, r*0.13, x, y, r);
+  g.addColorStop(0, '#ff5b52');
+  g.addColorStop(1, '#c21f1a');
+  return g;
+}
+
 /* ===================== FIELD RENDER + CATAPULT THROW ===================== */
 const FIELD = { w:900, h:620 };
 /* ---- 3D perspective renderer (first-person lane, matches the VR image) ----
@@ -651,7 +664,8 @@ function drawBall3D(ctx, x, d, airH){
   ctx.fillStyle='rgba(0,0,0,0.28)';
   ctx.beginPath(); ctx.ellipse(p.sx, p.sy, r*0.9, r*0.4, 0,0,2*Math.PI); ctx.fill();
   // red ball with a light seam like the VR ball
-  ctx.beginPath(); ctx.arc(p.sx, cy, r, 0,2*Math.PI); ctx.fillStyle='#e12d28'; ctx.fill();
+  ctx.beginPath(); ctx.arc(p.sx, cy, r, 0,2*Math.PI);
+  ctx.fillStyle=ballGradient(ctx, p.sx, cy, r); ctx.fill();
   ctx.strokeStyle='#8e1b18'; ctx.lineWidth=Math.max(1,2*p.scale); ctx.stroke();
   ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=Math.max(1,1.5*p.scale);
   ctx.beginPath(); ctx.ellipse(p.sx, cy, r*0.55, r, 0,0,2*Math.PI); ctx.stroke();
@@ -824,9 +838,8 @@ function runThrow(ctx, opts){
         ctx.moveTo(cat.forkR.x,cat.forkR.y); ctx.lineTo(bx+6,by); ctx.stroke();
         // pouch cradling the ball, then the ball on top
         drawPouch(ctx, bx, by, 15);
-        const grd=ctx.createRadialGradient(bx-4,by-4,2,bx,by,15);
-        grd.addColorStop(0,'#ff5b52'); grd.addColorStop(1,'#c21f1a');
-        ctx.beginPath(); ctx.arc(bx,by,15,0,2*Math.PI); ctx.fillStyle=grd; ctx.fill();
+        ctx.beginPath(); ctx.arc(bx,by,15,0,2*Math.PI);
+        ctx.fillStyle=ballGradient(ctx,bx,by,15); ctx.fill();
         ctx.strokeStyle='#8e1b18'; ctx.lineWidth=2; ctx.stroke();
         sub.textContent='Drag back to aim and power up — release to launch.';
       } else {
@@ -982,7 +995,8 @@ function runThrow(ctx, opts){
     // shadow roughly under it
     ctx.fillStyle='rgba(0,0,0,0.22)';
     ctx.beginPath(); ctx.ellipse(sx, sy+r*0.9, r*0.9, r*0.4, 0,0,2*Math.PI); ctx.fill();
-    ctx.beginPath(); ctx.arc(sx, sy, r, 0,2*Math.PI); ctx.fillStyle='#e12d28'; ctx.fill();
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0,2*Math.PI);
+    ctx.fillStyle=ballGradient(ctx, sx, sy, r); ctx.fill();
     ctx.strokeStyle='#8e1b18'; ctx.lineWidth=2; ctx.stroke();
     ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.ellipse(sx, sy, r*0.55, r, 0,0,2*Math.PI); ctx.stroke();
@@ -991,9 +1005,8 @@ function runThrow(ctx, opts){
 
   // simple flat screen-space ball (used at rest / in the sling)
   function drawBallScreen(x,y,r){
-    const grd=ctx.createRadialGradient(x-4,y-4,2,x,y,r);
-    grd.addColorStop(0,'#ff5b52'); grd.addColorStop(1,'#c21f1a');
-    ctx.beginPath(); ctx.arc(x,y,r,0,2*Math.PI); ctx.fillStyle=grd; ctx.fill();
+    ctx.beginPath(); ctx.arc(x,y,r,0,2*Math.PI);
+    ctx.fillStyle=ballGradient(ctx,x,y,r); ctx.fill();
     ctx.strokeStyle='#8e1b18'; ctx.lineWidth=2; ctx.stroke();
   }
 
