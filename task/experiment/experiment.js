@@ -118,7 +118,15 @@ const VARIANTS = {
   'moving-linear':   { ringRadius:1.20, ringDashed:true,  wobble:1, motion:'linear',
                        note:'ring sweeps left-right; replaces Moving-Linear' },
   'moving-circular': { ringRadius:1.20, ringDashed:true,  wobble:1, motion:'circular',
-                       note:'ring orbits on the ground plane; replaces Moving-Circular' }
+                       note:'ring orbits on the ground plane; replaces Moving-Circular' },
+  /* Revert to the pre-2026-10 paradigm: coerced targets are DRAWN AT RANDOM from
+     the original zones rather than being fixed distances. Condition is hardcoded
+     to stochastic, so the recruitment link carries no ?cond= and reveals nothing.
+     Everything else — the VR landing offset and roll, real_dist/rest_dist, the
+     ghost — stays as it is now, so the ball still rests where it was scored. */
+  'zones-stochastic':{ ringRadius:1.20, ringDashed:true,  wobble:1, motion:null,
+                       sampledZones:true, forceCondition:'stochastic',
+                       note:'old sampled zones, stochastic hardcoded' }
 };
 const DEFAULT_VARIANT = 'baseline';
 
@@ -217,7 +225,18 @@ class TrialManager{
       // center, which is the measured quantity, is identical across participants.
       const angle=uniform(0,2*Math.PI);
       const c=this._count('S');
-      const radius=SUCCESS_TARGET_DISTS[this._schedIdx(c,SUCCESS_TARGET_DISTS.length)];
+      let radius;
+      if(V.sampledZones){
+        // ORIGINAL paradigm: draw uniformly from the donut between this success's
+        // zone and the next one in, rather than taking a fixed distance. Restored
+        // verbatim from c33948a (27 Aug 2026).
+        if(c<this.successZoneSizes.length)
+          radius=uniform(this.successZoneSizes[c], this.successZoneSizes[c-1]);
+        else
+          radius=uniform(0, this.successZoneSizes[this.successZoneSizes.length-1]);
+      } else {
+        radius=SUCCESS_TARGET_DISTS[this._schedIdx(c,SUCCESS_TARGET_DISTS.length)];
+      }
       return {x:radius*Math.cos(angle), y:radius*Math.sin(angle), z:0};
     }else{
       // CHANGE 2: failures are fixed too. x is the MIDPOINT of the current
@@ -228,6 +247,14 @@ class TrialManager{
       // failure ordinal (mirrored for disimprovement), and y sits level with the
       // ring centre. Which SIDE is still chosen by throw direction, as in VR
       // (negative x = VR's "RIGHT").
+      if(V.sampledZones){
+        // ORIGINAL paradigm: uniform draw across the shift-adjusted failure zone,
+        // and a uniform depth offset too. Restored verbatim from c33948a.
+        const {right,left}=this.getFailureZoneRanges();
+        const x = throwDirX<0 ? uniform(right[0],right[1]) : uniform(left[0],left[1]);
+        const y = uniform(this.failY[0], this.failY[1]);
+        return {x,y,z:0};
+      }
       const fc=this._count('F');
       const dist=FAILURE_TARGET_DISTS[this._schedIdx(fc,FAILURE_TARGET_DISTS.length)];
       const x = (throwDirX<0 ? -1 : 1) * dist;
@@ -1662,6 +1689,7 @@ function makeThrowTrial({isPractice, label}){
             trial_kind: 'throw',
             participant: BT_CONFIG.participant,
             variant: VARIANT_KEY,                         // which arm this run is
+            sampled_zones: !!V.sampledZones,              // true = original random-draw targets
             dev_run: DEV.on,                              // true = a ?cond= / ?quick= test run
             dev_forced_condition: DEV.cond || null,
             ring_radius: V.ringRadius,
@@ -1928,6 +1956,15 @@ async function startExperiment(){
   // ?cond= forces a condition WITHOUT calling DataPipe, so a test run leaves the
   // balancing counter untouched. (A normal page load consumes an index whether
   // or not the participant finishes.)
+  // A variant may pin its own condition (zones-stochastic does). This keeps the
+  // condition out of the URL entirely, so the link reveals nothing to the
+  // participant, and it does not consume an index from the DataPipe counter.
+  if(V.forceCondition && !DEV.cond){
+    console.info('[variant] '+VARIANT_KEY+' pins condition: '+V.forceCondition);
+    initSession(V.forceCondition, false);
+    jsPsych.run(timeline);
+    return;
+  }
   if(DEV.cond){
     console.info('[dev] forced condition: '+DEV.cond+(DEV.quick?' (quick mode)':''));
     initSession(DEV.cond, false);
